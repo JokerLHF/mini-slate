@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/slate" },
+    { "path": "./packages/slate-react" }
+  ]
+}
