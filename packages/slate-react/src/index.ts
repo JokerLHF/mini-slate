@@ -1,4 +1,3 @@
-export const test = () => {
-  console.log('slate-react');
-}
-
+export * from './plugin/with-react';
+export * from './components/editable';
+export * from './components/slate';

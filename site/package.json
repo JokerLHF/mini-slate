@@ -15,5 +15,8 @@
   "dependencies": {
     "slate": "workspace:^1.0.0",
     "slate-react": "workspace:^1.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.21"
   }
 }

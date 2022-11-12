@@ -1,14 +1,13 @@
 import SlateCore from '../../packages/slate/package.json'
 import SlateReact from '../../packages/slate-react/package.json'
 import babel from 'rollup-plugin-babel'
-import builtins from 'rollup-plugin-node-builtins'
 import commonjs from 'rollup-plugin-commonjs'
-import globals from 'rollup-plugin-node-globals'
 import json from 'rollup-plugin-json'
 import replace from 'rollup-plugin-replace'
 import resolve from 'rollup-plugin-node-resolve'
 import typescript from 'rollup-plugin-typescript2'
 
+// https://zhuanlan.zhihu.com/p/221968604
 function configure(pkg, env, target) {
   const isModule = target === 'module';
   const input = `packages/${pkg.name}/src/index.ts`;
@@ -60,8 +59,6 @@ function configure(pkg, env, target) {
       'process.env.NODE_ENV': JSON.stringify(env),
     }),
 
-    // Register Node.js builtins for browserify compatibility.
-    builtins(),
 
     // Use Babel to transpile the result, limiting it to the source code.
     babel({
@@ -96,10 +93,6 @@ function configure(pkg, env, target) {
         '@babel/plugin-proposal-class-properties',
       ],
     }),
-
-    // Register Node.js globals for browserify compatibility.
-    globals(),
-
   ].filter(Boolean)
 
   return {
@@ -128,6 +121,6 @@ function factory(pkg, options = {}) {
 }
 
 export default [
-  factory(SlateCore),
   factory(SlateReact),
+  factory(SlateCore),
 ]

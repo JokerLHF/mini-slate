@@ -13,5 +13,9 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "immer": "^9.0.15",
+    "is-plain-object": "^5.0.0"
+  }
 }
