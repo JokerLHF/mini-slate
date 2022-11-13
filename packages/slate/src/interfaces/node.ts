@@ -8,6 +8,18 @@ export type Node = Editor | Element | Text;
 export type Ancestor = Editor | Element;
 export type NodeEntry<T extends Node = Node> = [T, Path];
 
+export interface NodeNodesOptions {
+  from?: Path,
+  to?: Path,
+  reverse?: boolean,
+}
+
+export interface NodeTextsOptions {
+  from?: Path,
+  to?: Path,
+  reverse?: boolean,
+}
+
 /**
  * slate 本身提供的
  */
@@ -19,8 +31,8 @@ export interface NodeInterface {
   first: (root: Node, path: Path) => NodeEntry,
   last: (root: Node, path: Path) => NodeEntry,
   has:(root: Node, path: Path) => boolean,
-  texts: (root: Node,) => Generator<NodeEntry<Text>, void, undefined>,
-  nodes: (root: Node) => Generator<NodeEntry, void, undefined>,
+  texts: (root: Node, options?: NodeTextsOptions) => Generator<NodeEntry<Text>, void, undefined>,
+  nodes: (root: Node, options?: NodeNodesOptions) => Generator<NodeEntry, void, undefined>,
   string: (node: Node) => string,
 }
 
@@ -60,7 +72,7 @@ export const Node: NodeInterface = {
     let p = path.slice();
     let n = Node.get(root, path);
     while(true) {
-      if (Text.isText(n)) {
+      if (Text.isText(n) || n.children.length === 0) {
         break;
       }
       n = n.children[0]
@@ -76,7 +88,7 @@ export const Node: NodeInterface = {
     let p = path.slice();
     let n = Node.get(root, path);
     while(true) {
-      if (Text.isText(n)) {
+      if (Text.isText(n) || n.children.length === 0) {
         break;
       }
       const i = n.children.length - 1;
@@ -105,8 +117,8 @@ export const Node: NodeInterface = {
   /**
    * 从 root 开始，返回所有 文本子节点
    */
-  *texts(root: Node): Generator<NodeEntry<Text>, void, undefined> {
-    for (const [node, path] of Node.nodes(root)) {
+  *texts(root: Node, options: NodeTextsOptions = {}): Generator<NodeEntry<Text>, void, undefined> {
+    for (const [node, path] of Node.nodes(root, options)) {
       if (Text.isText(node)) {
         yield [node, path]
       }
@@ -121,12 +133,19 @@ export const Node: NodeInterface = {
    */
   *nodes(
     root: Node,
+    options: NodeNodesOptions = {}
   ): Generator<NodeEntry, void, undefined> {
+    const { from = [], to, reverse = false } = options;
     let n = root;
     let p: Path = [];
     const visited = new Set();
 
     while(true) {
+      // path 不再 from 和 to 中间
+      if (to && (reverse ? Path.isBefore(p, to) : Path.isAfter(p, to))) {
+        break
+      }
+
       if (!visited.has(n)) {
         yield [n, p]
       }
@@ -135,7 +154,12 @@ export const Node: NodeInterface = {
       if (!visited.has(n) && !Text.isText(n) && !!n.children.length) {
         visited.add(n);
 
-        const newIndex = 0;
+        let newIndex = reverse ? n.children.length - 1 : 0;
+        // 有传入 from 的，走 from 那一条路径
+        if (Path.isAncestor(p, from)) {
+          newIndex = from[p.length];
+        }
+  
         p = p.concat(newIndex);
         n = Node.get(root, p);
         continue;
@@ -146,9 +170,9 @@ export const Node: NodeInterface = {
         break
       }
 
-      // 2.  遍历到叶子节点（文本节点 or 没有 children 的 slateElement）， 递归兄弟节点
-      const newPath = Path.next(p);
-      if (Node.has(n, newPath)) {
+      // 2. 递归兄弟节点
+      const newPath = reverse ? Path.previous(p) : Path.next(p);
+      if (Node.has(root, newPath)) {
         p = newPath;
         n = Node.get(root, newPath);
         continue;

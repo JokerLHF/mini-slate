@@ -2,6 +2,9 @@ import { Editor, Selection } from "../interfaces/editor"
 import { Operation } from "../interfaces/operation"
 import { createDraft, finishDraft, isDraft } from 'immer'
 import { Range } from '../interfaces/range';
+import { Node } from '../interfaces/node';
+import { Text } from "../interfaces/text";
+import { Point } from "../interfaces/point";
 
 export interface GeneralTransforms {
   transform: (editor: Editor, op: Operation) => void
@@ -38,6 +41,22 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
           selection[key] = value
         }
       }
+      break;
+    }
+
+    case 'insert_text': {
+      const { path, offset, text } = op;
+      const node = Node.get(editor, path) as Text;
+      const before = node.text.slice(0, offset);
+      const after = node.text.slice(offset);
+      node.text = before + text + after;
+
+      if (selection) {
+        const { anchor, focus } = selection;
+        selection.anchor = Point.transform(anchor, op)!;
+        selection.focus = Point.transform(focus, op)!;
+      }
+      break;
     }
   }
   return selection;

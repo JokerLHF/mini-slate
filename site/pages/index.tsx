@@ -5,13 +5,13 @@ import { createEditor, Element, Editor, Descendant, Text } from 'slate';
 const initialValue: Descendant[] = [
   {
     children: [
-      // { type: 'void', children: [
-      //   { text: '111' },
-      //   {text: '222'}
-      // ] },
-      // { type: 'no-inline', children: [{text: ''}] },
-      // { type: 'inline', children: [{text: '333'}] },
-      { type: 'test', children: [{text: 'abcd'}] },
+      { type: 'void', children: [
+        { text: '111' },
+        {text: '222'}
+      ] },
+      { type: 'no-inline', children: [{text: ''}] },
+      { type: 'inline', children: [{text: '333'}] },
+      // { type: 'test', children: [{text: 'abcd'}] },
     ]
   },
 ]
@@ -55,65 +55,65 @@ const EditableVoid = ({ attributes, children, element }) => {
 }
 const HomePage = () => {
   const editor = useMemo(() => widthVoid(withReact(createEditor())), [])
-  const decorate = useCallback(([node, path]) => {
+  // const decorate = useCallback(([node, path]) => {
 
-    if (!Text.isText(node)) {
-      return [];
-    }
-    // 用的是 middle 的测试用例
-    return [
-      {
-        anchor: {
-          path: [0],
-          offset: 1,
-        },
-        focus: {
-          path: [0],
-          offset: 2,
-        },
-        decoration1: 'decoration1',
-      },
-      {
-        anchor: {
-          path: [0],
-          offset: 2,
-        },
-        focus: {
-          path: [0],
-          offset: 2,
-        },
-        decoration2: 'decoration2',
-      },
-      {
-        anchor: {
-          path: [0],
-          offset: 2,
-        },
-        focus: {
-          path: [0],
-          offset: 3,
-        },
-        decoration3: 'decoration3',
-      },
-      {
-        anchor: {
-          path: [0],
-          offset: 4,
-        },
-        focus: {
-          path: [0],
-          offset: 4,
-        },
-        decoration4: 'decoration4',
-      },
-    ]
-  }, [])
+  //   if (!Text.isText(node)) {
+  //     return [];
+  //   }
+  //   // 用的是 middle 的测试用例
+  //   return [
+  //     {
+  //       anchor: {
+  //         path: [0],
+  //         offset: 1,
+  //       },
+  //       focus: {
+  //         path: [0],
+  //         offset: 2,
+  //       },
+  //       decoration1: 'decoration1',
+  //     },
+  //     {
+  //       anchor: {
+  //         path: [0],
+  //         offset: 2,
+  //       },
+  //       focus: {
+  //         path: [0],
+  //         offset: 2,
+  //       },
+  //       decoration2: 'decoration2',
+  //     },
+  //     {
+  //       anchor: {
+  //         path: [0],
+  //         offset: 2,
+  //       },
+  //       focus: {
+  //         path: [0],
+  //         offset: 3,
+  //       },
+  //       decoration3: 'decoration3',
+  //     },
+  //     {
+  //       anchor: {
+  //         path: [0],
+  //         offset: 4,
+  //       },
+  //       focus: {
+  //         path: [0],
+  //         offset: 4,
+  //       },
+  //       decoration4: 'decoration4',
+  //     },
+  //   ]
+  // }, [])
 
   return (
     <Slate editor={editor} value={initialValue}>
       <Editable
         renderElement={handleRenderElement}
-        decorate={decorate}
+        // decorate={decorate}
       />
     </Slate>
   )

@@ -220,15 +220,16 @@ export const ReactEditor = {
       suppressThrow: boolean  // 压制错误，不处理错误
     }
   ): Point | null {
-    const { exactMatch, suppressThrow } = options || {}
+    const { suppressThrow } = options || {}
     const [nearestNode, nearestOffset] = dompoint;
     let textNode: DOMElement | null = null
     let offset = 0
 
     /**
      * slate 逻辑：如果 nearestNode 是 element 那么找到对应的 textNode，但是这个逻辑好像没有地方用。 就是 exactMatch = true
-     * 所以这里将 nearestNode 当做 textNode 去处理即可
+     * 所以这里将 nearestNode 当做 textDOMNode 去处理即可, 因为要做 dom 操作，需要 textDomNode 向上找 parent
      */
+
     const parentNode = nearestNode.parentElement as DOMElement;
     
     if (parentNode) {
@@ -242,7 +243,29 @@ export const ReactEditor = {
   
       if (leafNode) {
         textNode = leafNode.closest('[data-slate-node="text"]');
-        offset = leafNode.textContent!.length
+        if (textNode) {
+          /**
+           * 注意这路有个坑：对于空节点来说会渲染成 uFEFF 作为占位符，给光标站位置，
+           * 但是在 collapse 的情况下， 点击 uFEFF 返回的 domSelection 的 offset 是 1。
+           * 这里需要做修正变为 0, 创建一个 range，把 range 中所有空节点都删除
+           */
+          const range = window.document.createRange();
+          range.setStart(textNode, 0);
+          range.setEnd(nearestNode, nearestOffset);
+          const contents = range.cloneContents();
+          const removals = [
+            ...Array.prototype.slice.call(
+              contents.querySelectorAll('[data-slate-zero-width]')
+            ),
+          ]
+          removals.forEach(el => {
+            // COMPAT: While composing at the start of a text node, some keyboards put
+            // the text content inside the zero width space.
+            el!.parentNode!.removeChild(el)
+          })
+
+          offset = contents.textContent!.length;
+        }
       } else if (voidNode) {
         // 向下找到 leaf 节点
         const leafNode = voidNode.querySelector('[data-slate-leaf]');

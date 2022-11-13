@@ -1,6 +1,8 @@
 import { Path } from "./path"
 import { isPlainObject } from 'is-plain-object';
 import { ExtendedType } from "./custom-types";
+import { Operation } from "./operation";
+import produce from "immer";
 
 export interface BasePoint {
   path: Path
@@ -14,6 +16,10 @@ export interface PointInterface {
   isAfter: (point: Point, another: Point) => boolean,
   compare: (point: Point, another: Point) => -1 | 0 | 1,
   equals: (point: Point, another: Point) => boolean,
+  transform: (
+    point: Point,
+    op: Operation,
+  ) => Point | null
 }
 
 export const Point: PointInterface = {
@@ -30,6 +36,7 @@ export const Point: PointInterface = {
   isAfter(point: Point, another: Point): boolean {
     return Point.compare(point, another) === 1;
   },
+
   /**
    * 比较两个 Point 的前后关系
    * -1 表示 point 在 another 前面
@@ -48,5 +55,24 @@ export const Point: PointInterface = {
   },
   equals(point: Point, another: Point): boolean {
     return Path.equals(point.path, another.path) && point.offset == another.offset;
+  },
+
+  transform(
+    point: Point | null,
+    op: Operation,
+  ): Point | null {
+    return produce(point, p => {
+      if (!p) {
+        return null;
+      }
+      switch (op.type) {
+        case 'insert_text':
+          const { path, text, offset } = op;
+          if (Path.equals(path, p.path) && p.offset === offset) {
+            p.offset += text.length
+          }
+          break;
+      }
+    })
   }
 }

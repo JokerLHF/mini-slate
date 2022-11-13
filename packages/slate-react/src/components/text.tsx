@@ -38,7 +38,7 @@ const Text = (props: {
         leaf={leaf}
         parent={parent}
         renderLeaf={renderLeaf}
-        key={key.id}
+        key={`${key.id}-${i}`}
       />
     )
   }

@@ -40,5 +40,8 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "mocha": "^10.1.0"
+  }
 }

@@ -11,6 +11,14 @@ export const createEditor = (): Editor => {
     isInline: () => false,
     isVoid: () => false,
 
+    insertText: (text: string) => {
+      const { selection } = editor;
+      if (!selection) {
+        return;
+      }
+      Transforms.insertText(editor, text);
+    },
+
     apply: (op: Operation) => {
       editor.operations.push(op);
       Transforms.transform(editor, op);

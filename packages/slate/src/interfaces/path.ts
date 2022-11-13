@@ -6,7 +6,11 @@ export interface PathInterface {
   equals: (path: Path, another: Path) => boolean,
   common: (path: Path, another: Path) => Path,
   next: (path: Path) => Path,
+  previous: (path: Path) => Path,
   parent: (path: Path) => Path,
+  isAfter: (path: Path, another: Path) => boolean
+  isAncestor: (path: Path, another: Path) => boolean
+  isBefore: (path: Path, another: Path) => boolean
 }
 
 export const Path: PathInterface = {
@@ -17,10 +21,10 @@ export const Path: PathInterface = {
     )
   },
   /**
-   * 比较两个 Point 的前后关系
-   * -1 表示 point 在 another 前面
-   * 1 表示 point 在 another 后面
-   * 0 表示 point 和 another 是祖先关系或者相等关系
+   * 比较两个 path 的前后关系
+   * -1 表示 path 在 another 前面
+   * 1 表示 path 在 another 后面
+   * 0 表示 path 和 another 是祖先关系或者相等关系
    */
   compare(path: Path, another: Path): -1 | 0 | 1 {
     const min = Math.min(path.length, another.length);
@@ -33,6 +37,29 @@ export const Path: PathInterface = {
 
   equals(path: Path, another: Path): boolean {
     return (path.length === another.length && path.every((n, i) => n === another[i]))
+  },
+
+  /**
+   * Check if a path is after another.
+   */
+
+  isAfter(path: Path, another: Path): boolean {
+    return Path.compare(path, another) === 1
+  },
+
+  /**
+   * 判断 path 是否是 another 的祖先
+   */
+  isAncestor(path: Path, another: Path): boolean {
+    return path.length < another.length && Path.compare(path, another) === 0
+  },
+
+  /**
+   * Check if a path is before another.
+   */
+
+  isBefore(path: Path, another: Path): boolean {
+    return Path.compare(path, another) === -1
   },
 
   /**
@@ -68,6 +95,21 @@ export const Path: PathInterface = {
 
     const last = path[path.length - 1]
     return path.slice(0, -1).concat(last + 1)
+  },
+
+    /**
+   * Given a path, get the path to the next sibling node.
+   * 比如 [1, 2, 3] 返回 [1, 2, 2]
+   */
+  previous(path: Path): Path {
+    if (path.length === 0) {
+      throw new Error(
+        `Cannot get the next path of a root path [${path}], because it has no next index.`
+      )
+    }
+
+    const last = path[path.length - 1]
+    return path.slice(0, -1).concat(last - 1)
   },
     
   /**
