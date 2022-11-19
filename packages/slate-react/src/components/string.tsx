@@ -64,25 +64,31 @@ const String = (props: {
 /**
  * Leaf strings with text in them.
  */
+// TODO: 不是很理解为什么要用 ref 去处理
+// const TextString = (props: { text: string }) => {  
+//   const { text } = props;
+//   const ref = useRef<HTMLSpanElement>(null);
+
+//   useIsomorphicLayoutEffect(() => {
+//     if (ref.current && ref.current.textContent !== text) {
+//       ref.current.textContent = text;
+//     }
+//   })
+
+//   // Render text content immediately if it's the first-time render
+//   // Ensure that text content is rendered on server-side rendering
+//   if (!ref.current) {
+//     return (
+//       <span data-slate-string ref={ref}>{text}</span>
+//     )
+//   }
+
+//   return  <span data-slate-string ref={ref}>{text}</span>
+// }
+
 const TextString = (props: { text: string }) => {
   const { text } = props;
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useIsomorphicLayoutEffect(() => {
-    if (ref.current && ref.current.textContent !== text) {
-      ref.current.textContent = text;
-    }
-  })
-
-  // Render text content immediately if it's the first-time render
-  // Ensure that text content is rendered on server-side rendering
-  if (!ref.current) {
-    return (
-      <span data-slate-string ref={ref}>{text}</span>
-    )
-  }
-
-  return <span data-slate-string ref={ref} />
+  return  <span data-slate-string>{text}</span>
 }
 
 /**

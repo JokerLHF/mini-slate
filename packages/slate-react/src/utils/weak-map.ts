@@ -24,4 +24,7 @@ export const EDITOR_TO_KEY_TO_ELEMENT: WeakMap<
 > = new WeakMap();
 
 
-export const EDITOR_TO_ON_CHANGE = new WeakMap<Editor, () => void>()
+export const EDITOR_TO_ON_CHANGE = new WeakMap<Editor, () => void>();
+
+// 中文输入法
+export const IS_COMPOSING: WeakMap<Editor, boolean> = new WeakMap()

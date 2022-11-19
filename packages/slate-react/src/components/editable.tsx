@@ -4,7 +4,7 @@ import { useSlate } from '../hooks/use-slate';
 import { Element, Text, Transforms, Range, NodeEntry, Editor } from 'slate';
 import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect';
 import { ReactEditor } from '../plugin/react-editor';
-import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW } from '../utils/weak-map';
+import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING } from '../utils/weak-map';
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
 import { DecorateContext } from '../hooks/use-decorate';
@@ -53,7 +53,12 @@ export const Editable = (props: EditableProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const deferredOperations = useRef<DeferredOperation[]>([]);
 
-  const onDOMSelectionChange = useCallback(throttle(() => {    
+  const onDOMSelectionChange = useCallback(throttle(() => {
+    // 中文环境不处理 selection, 等 compositionEnd 之后再出来    
+    if (ReactEditor.isComposing(editor)) {
+      return;
+    }
+
     const root = ReactEditor.findDocumentOrShadowRoot(editor);
     const domSelection = root.getSelection();
     
@@ -73,7 +78,7 @@ export const Editable = (props: EditableProps) => {
         Transforms.select(editor, range)
       }
     }
-  }, 10), []);
+  }, 10), [editor]);
 
   const scheduleOnDOMSelectionChange = useMemo(
     () => debounce(onDOMSelectionChange, 0),
@@ -153,25 +158,32 @@ export const Editable = (props: EditableProps) => {
   });
 
   const onBeforeInput = useCallback((event: InputEvent) => {
+    // 中文环境交给浏览器渲染    
+    if (ReactEditor.isComposing(editor)) {
+      return;
+    }
+
     const { inputType, data } = event;
-    const { selection } = editor;
     let isNative = false;
 
-    if (
-      inputType === 'insertText' &&
-      data &&
-      data.length === 1 &&
-      /[a-z ]/i.test(data) &&  // TODO：为什么做着限制
-      selection &&
-      Range.isCollapsed(selection)
-    ) {
-      isNative = true;
-    }
+    // const { selection } = editor;
+    // TODO: 还不是很理解为什么这里对于单字符的插入要使用 浏览器接管渲染
+    // if (
+    //   inputType === 'insertText' &&
+    //   data &&
+    //   data.length === 1 &&
+    //   /[a-z ]/i.test(data) &&  // TODO：为什么做着限制
+    //   selection &&
+    //   Range.isCollapsed(selection)
+    // ) {
+    //   isNative = true;
+    // }
 
     if (!isNative) {
       event.preventDefault();
     }
 
+    console.log('onBeforeInput', event);
     switch (inputType) {
       case 'insertText':
         if (typeof data === 'string') {
@@ -186,7 +198,7 @@ export const Editable = (props: EditableProps) => {
       default:
         break;
     }
-  }, []);
+  }, [editor]);
 
   useIsomorphicLayoutEffect(() => {    
     ref.current?.addEventListener('beforeinput', onBeforeInput);
@@ -200,12 +212,6 @@ export const Editable = (props: EditableProps) => {
         contentEditable={true}
         suppressContentEditableWarning // 给标签设置可编辑的属性contentEditable，页面会弹出警告，这个属性去除
         data-slate-editor
-        onInput={useCallback((event: React.SyntheticEvent) => {
-          for (const op of deferredOperations.current) {
-            op();
-          }
-          deferredOperations.current = []
-        }, [])}
         style={{
           padding: 20,
           border: '1px black solid',
@@ -213,6 +219,19 @@ export const Editable = (props: EditableProps) => {
           // react 渲染多个空格的时候，默认只会渲染成一个空格，这个属性允许渲染多个
           whiteSpace: 'pre-wrap',
         }}
+        onInput={useCallback((event: React.SyntheticEvent) => {          
+          for (const op of deferredOperations.current) {
+            op();
+          }
+          deferredOperations.current = []
+        }, [])}
+        onCompositionUpdate={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
+          IS_COMPOSING.set(editor, true);
+        }, [editor])}
+        onCompositionEnd={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
+          IS_COMPOSING.set(editor, false);
+          Editor.insertText(editor, event.data);
+        }, [editor])}
       >
         <Children
           node={editor} 
@@ -233,5 +252,6 @@ export const hasEditableTarget = (
 
 /**
  * oninput 只有在浏览器接管渲染的时候才会执行，
- * 执行顺序 beforeinput => oninput => beforeinput
+ * onComposition 只有在中文环境下才执行
+ * 执行顺序 onCompositionStart => beforeinput => onCompositionUpdate => oninput => selectionChange
  */

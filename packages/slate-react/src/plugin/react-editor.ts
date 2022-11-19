@@ -1,7 +1,7 @@
 import { BaseEditor, Editor, Path, Node, Point, Range } from "slate";
 import { DOMNode, DOMRange, DOMSelection, DOMStaticRange, isDOMSelection, DOMPoint, isDOMElement, DOMElement } from "../utils/dom";
 import { Key } from "../utils/key";
-import { EDITOR_TO_ELEMENT, EDITOR_TO_KEY_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, NODE_TO_INDEX, NODE_TO_KEY, NODE_TO_PARENT } from "../utils/weak-map";
+import { EDITOR_TO_ELEMENT, EDITOR_TO_KEY_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, NODE_TO_INDEX, NODE_TO_KEY, NODE_TO_PARENT } from "../utils/weak-map";
 
 export interface ReactEditor extends BaseEditor {
 
@@ -305,5 +305,9 @@ export const ReactEditor = {
 
     // 找到 text 节点
     return [text, point.offset];
+  },
+
+  isComposing(editor: ReactEditor): boolean {
+    return !!IS_COMPOSING.get(editor);
   }
 }
