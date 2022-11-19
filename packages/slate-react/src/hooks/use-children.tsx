@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Ancestor, Descendant, Element, Text } from "slate";
 import { RenderElementProps, RenderLeafProps } from "../components/editable";
 import ElementComponent from '../components/element';
@@ -26,7 +26,8 @@ export const useChildren = (props: {
   const children: JSX.Element[] = [];
   for (let i = 0; i < node.children.length; i++) {
     const n = node.children[i] as Descendant;
-    const p = path.concat(i)
+    const p = path.concat(i);
+    
     const key = ReactEditor.findKey(editor, n);
     const ds = decorate([n, p]);
 
@@ -35,10 +36,10 @@ export const useChildren = (props: {
         <ElementComponent
           element={n}
           renderElement={renderElement}
+          renderLeaf={renderLeaf}
           key={key.id}
         />
       )
-      
     } else {
       children.push(
         <TextComponent
@@ -50,7 +51,6 @@ export const useChildren = (props: {
         />
       )
     }
-
 
     NODE_TO_INDEX.set(n, i);
     NODE_TO_PARENT.set(n, node)

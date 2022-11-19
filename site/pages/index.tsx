@@ -5,26 +5,28 @@ import { createEditor, Element, Editor, Descendant, Text } from 'slate';
 const initialValue: Descendant[] = [
   {
     children: [
-      { type: 'void', children: [
-        { text: '111' },
-        {text: '222'}
-      ] },
-      { type: 'no-inline', children: [{text: ''}] },
-      { type: 'inline', children: [{text: '333'}] },
+      // { type: 'void', children: [
+      //   { text: '111' },
+      //   {text: '222'}
+      // ] },
+      // { type: 'no-inline', children: [{text: ''}] },
+      // { type: 'inline', children: [{text: '333'}] },
+      {text: '333'},
+
       // { type: 'test', children: [{text: 'abcd'}] },
     ]
   },
 ]
 
 const widthVoid = (editor: Editor) => {
-  const { isVoid, isInline } = editor;
+  // const { isVoid, isInline } = editor;
 
-  editor.isVoid = (element: Element) => {
-    return element.type === 'void' ? true : isVoid(element);
-  }
-  editor.isInline = (element: Element) => {
-    return element.type === 'inline' ? true : isInline(element);
-  } 
+  // editor.isVoid = (element: Element) => {
+  //   return element.type === 'void' ? true : isVoid(element);
+  // }
+  // editor.isInline = (element: Element) => {
+  //   return element.type === 'inline' ? true : isInline(element);
+  // } 
   (globalThis as any).editor = editor
   return editor;
 }
@@ -112,7 +114,7 @@ const HomePage = () => {
   return (
     <Slate editor={editor} value={initialValue}>
       <Editable
-        renderElement={handleRenderElement}
+        // renderElement={handleRenderElement}
         // decorate={decorate}
       />
     </Slate>

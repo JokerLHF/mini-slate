@@ -31,6 +31,17 @@ export interface EditorPositionsOptions {
   reverse?: boolean,
 }
 
+export type NodeMatch<T extends Node> =
+  | ((node: Node, path: Path) => node is T)
+  | ((node: Node, path: Path) => boolean)
+
+export interface EditorLevelsOptions<T extends Node> {
+  at?: Location
+  match?: NodeMatch<T>
+  reverse?: boolean
+  voids?: boolean
+}
+
 /**
  * slate 本身提供的
  */
@@ -52,17 +63,21 @@ export interface BaseEditor {
 export type Editor = ExtendedType<BaseEditor>;
 
 export interface EditorInterface {
-  isEditor: (value: any) => boolean,
-  range: (editor: Editor, at: Location, to?: Location) => Range,
-  path: (editor: Editor, at: Location, options?: EditorPathOptions) => Path,
-  point: (editor: Editor, at: Location, options?: EditorPointOptions) => Point,
-  hasPath: (editor: Editor, path: Path) => boolean,
-  node: (editor: Editor, at: Location, options?: EditorNodeOptions) => NodeEntry,
-  isVoid: (editor: Editor, value: any) => value is Element,
-  before: (editor: Editor,at: Location) => Point | undefined,
-  positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>,
+  isEditor: (value: any) => boolean;
+  range: (editor: Editor, at: Location, to?: Location) => Range;
+  path: (editor: Editor, at: Location, options?: EditorPathOptions) => Path;
+  point: (editor: Editor, at: Location, options?: EditorPointOptions) => Point;
+  hasPath: (editor: Editor, path: Path) => boolean;
+  node: (editor: Editor, at: Location, options?: EditorNodeOptions) => NodeEntry;
+  isVoid: (editor: Editor, value: any) => value is Element;
+  before: (editor: Editor,at: Location) => Point | undefined;
+  positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>;
 
-  insertText: (editor: Editor, text: string) => void
+  insertText: (editor: Editor, text: string) => void;
+  levels: <T extends Node>(
+    editor: Editor,
+    options?: EditorLevelsOptions<T>
+  ) => Generator<NodeEntry<T>, void, undefined>
 }
 
 export const Editor: EditorInterface = {
@@ -245,5 +260,33 @@ export const Editor: EditorInterface = {
 
   insertText(editor: Editor, text: string) {
     editor.insertText(text);
+  },
+
+  *levels<T extends Node>(
+    editor: Editor,
+    options: EditorLevelsOptions<T> = {}
+  ): Generator<NodeEntry<T>, void, undefined> {
+    let { at = editor.selection, match } = options;
+    if (!at) {
+      return;
+    }
+
+    if (!match) {
+      match = () => true
+    }
+
+    const levels: NodeEntry<T>[] = [];
+    // 获取最底层的 textSlateNode 的 path 
+    const path = Editor.path(editor, at);
+
+    for (const [n, p] of Node.levels(editor, path)) {
+      if (!match(n, p)) {
+        continue;
+      }
+      levels.push([n, p]);
+    }
+
+    // 这个是什么语法 跟 yied levels 有什么不同？？
+    yield* levels;
   }
 }

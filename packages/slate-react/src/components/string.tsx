@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { Element, Text, Node } from 'slate'
+import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect'
 import { useSlate } from '../hooks/use-slate'
 
 /**
@@ -65,8 +66,23 @@ const String = (props: {
  */
 const TextString = (props: { text: string }) => {
   const { text } = props;
+  const ref = useRef<HTMLSpanElement>(null);
 
-  return <span data-slate-string>{text}</span>
+  useIsomorphicLayoutEffect(() => {
+    if (ref.current && ref.current.textContent !== text) {
+      ref.current.textContent = text;
+    }
+  })
+
+  // Render text content immediately if it's the first-time render
+  // Ensure that text content is rendered on server-side rendering
+  if (!ref.current) {
+    return (
+      <span data-slate-string ref={ref}>{text}</span>
+    )
+  }
+
+  return <span data-slate-string ref={ref} />
 }
 
 /**

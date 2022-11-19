@@ -1,16 +1,17 @@
 export type Path = number[]
 
 export interface PathInterface {
-  isPath: (value: any) => value is Path,
-  compare: (path: Path, another: Path) => -1 | 0 | 1,
-  equals: (path: Path, another: Path) => boolean,
-  common: (path: Path, another: Path) => Path,
-  next: (path: Path) => Path,
-  previous: (path: Path) => Path,
-  parent: (path: Path) => Path,
-  isAfter: (path: Path, another: Path) => boolean
-  isAncestor: (path: Path, another: Path) => boolean
-  isBefore: (path: Path, another: Path) => boolean
+  isPath: (value: any) => value is Path;
+  compare: (path: Path, another: Path) => -1 | 0 | 1;
+  equals: (path: Path, another: Path) => boolean;
+  common: (path: Path, another: Path) => Path;
+  next: (path: Path) => Path;
+  previous: (path: Path) => Path;
+  parent: (path: Path) => Path;
+  isAfter: (path: Path, another: Path) => boolean;
+  isAncestor: (path: Path, another: Path) => boolean;
+  isBefore: (path: Path, another: Path) => boolean;
+  levels: (path: Path) => Path[];
 }
 
 export const Path: PathInterface = {
@@ -122,4 +123,15 @@ export const Path: PathInterface = {
 
     return path.slice(0, -1)
   },
+  /**
+   * 返回 path 所有的父节点，比如[1, 2, 3]
+   * 返回 [1], [1, 2]
+   */
+  levels(path: Path): Path[] {
+    const list: Path[] = []
+    for (let i = 0; i <= path.length; i++) {
+      list.push(path.slice(0, i));
+    }
+    return list;
+  }
 }

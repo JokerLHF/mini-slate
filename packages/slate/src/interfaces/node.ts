@@ -25,15 +25,16 @@ export interface NodeTextsOptions {
  */
 
 export interface NodeInterface {
-  isNodeList: (value: any) => boolean,
-  isNode: (value: any) => boolean,
-  get: (root: Node, path: Path) => Node,
-  first: (root: Node, path: Path) => NodeEntry,
-  last: (root: Node, path: Path) => NodeEntry,
-  has:(root: Node, path: Path) => boolean,
-  texts: (root: Node, options?: NodeTextsOptions) => Generator<NodeEntry<Text>, void, undefined>,
-  nodes: (root: Node, options?: NodeNodesOptions) => Generator<NodeEntry, void, undefined>,
-  string: (node: Node) => string,
+  isNodeList: (value: any) => boolean;
+  isNode: (value: any) => boolean;
+  get: (root: Node, path: Path) => Node;
+  first: (root: Node, path: Path) => NodeEntry;
+  last: (root: Node, path: Path) => NodeEntry;
+  has:(root: Node, path: Path) => boolean;
+  texts: (root: Node, options?: NodeTextsOptions) => Generator<NodeEntry<Text>, void, undefined>;
+  nodes: (root: Node, options?: NodeNodesOptions) => Generator<NodeEntry, void, undefined>;
+  string: (node: Node) => string;
+  levels: (root: Node, path: Path) => Generator<NodeEntry, void, undefined>;
 }
 
 export const Node: NodeInterface = {
@@ -193,4 +194,14 @@ export const Node: NodeInterface = {
       return node.children.map(Node.string).join('')
     }
   },
+
+  *levels(
+    root: Node,
+    path: Path,
+  ): Generator<NodeEntry, void, undefined> {
+    for (const p of Path.levels(path)) {
+      const n = Node.get(root, p);
+      yield [n, p]
+    }
+  }
 }

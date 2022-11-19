@@ -17,7 +17,7 @@ export const ELEMENT_TO_NODE: WeakMap<HTMLElement, Node> = new WeakMap();
 
 // Node To Element
 export const EDITOR_TO_ELEMENT: WeakMap<Editor, HTMLElement> = new WeakMap();
-export const NODE_TO_KEY: WeakMap<Node, Key> = new WeakMap();
+export const NODE_TO_KEY: WeakMap<Node, Key> = ((globalThis as any).NODE_TO_KEY) = new WeakMap();
 export const EDITOR_TO_KEY_TO_ELEMENT: WeakMap<
   Editor,
   WeakMap<Key, HTMLElement>

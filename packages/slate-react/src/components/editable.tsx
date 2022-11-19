@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useChildren } from '../hooks/use-children';
 import { useSlate } from '../hooks/use-slate';
 import { Element, Text, Transforms, Range, NodeEntry, Editor } from 'slate';
@@ -26,6 +26,7 @@ export interface RenderLeafProps {
   }
 }
 
+type DeferredOperation = () => void;
 
 export const defaultDecorate: (entry: NodeEntry) => Range[] = () => []
 
@@ -35,9 +36,10 @@ export type EditableProps = {
   decorate?: (entry: NodeEntry) => Range[]
 };
 
-const Children = (props: Parameters<typeof useChildren>[0]) => (
-  <React.Fragment>{useChildren(props)}</React.Fragment>
-);
+const Children = (props: Parameters<typeof useChildren>[0]) => {
+  const children = useChildren(props);  
+  return <React.Fragment>{children}</React.Fragment>
+};
 
 export const Editable = (props: EditableProps) => {
   const {
@@ -49,8 +51,9 @@ export const Editable = (props: EditableProps) => {
   const Component = 'div';
   const editor = useSlate();
   const ref = useRef<HTMLDivElement>(null);
+  const deferredOperations = useRef<DeferredOperation[]>([]);
 
-  const onDOMSelectionChange = useCallback(throttle(() => {
+  const onDOMSelectionChange = useCallback(throttle(() => {    
     const root = ReactEditor.findDocumentOrShadowRoot(editor);
     const domSelection = root.getSelection();
     
@@ -151,26 +154,45 @@ export const Editable = (props: EditableProps) => {
 
   const onBeforeInput = useCallback((event: InputEvent) => {
     const { inputType, data } = event;
-    event.preventDefault();
+    const { selection } = editor;
+    let isNative = false;
+
+    if (
+      inputType === 'insertText' &&
+      data &&
+      data.length === 1 &&
+      /[a-z ]/i.test(data) &&  // TODO：为什么做着限制
+      selection &&
+      Range.isCollapsed(selection)
+    ) {
+      isNative = true;
+    }
+
+    if (!isNative) {
+      event.preventDefault();
+    }
 
     switch (inputType) {
       case 'insertText':
         if (typeof data === 'string') {
-          Editor.insertText(editor, data);
+          if (isNative) {
+            deferredOperations.current.push(() =>
+              Editor.insertText(editor, data)
+            )
+          } else {
+            Editor.insertText(editor, data)
+          }
         }
       default:
         break;
     }
-    console.log('event', event);
   }, []);
 
-  useIsomorphicLayoutEffect(() => {
-    console.log('ref.current', ref.current);
-    
+  useIsomorphicLayoutEffect(() => {    
     ref.current?.addEventListener('beforeinput', onBeforeInput);
     return () => ref.current?.removeEventListener('beforeinput', onBeforeInput);
   }, [onBeforeInput]);
-
+  
   return (
     <DecorateContext.Provider value={decorate}>
       <Component
@@ -178,7 +200,19 @@ export const Editable = (props: EditableProps) => {
         contentEditable={true}
         suppressContentEditableWarning // 给标签设置可编辑的属性contentEditable，页面会弹出警告，这个属性去除
         data-slate-editor
-        style={{ padding: 20, border: '1px black solid' }}
+        onInput={useCallback((event: React.SyntheticEvent) => {
+          for (const op of deferredOperations.current) {
+            op();
+          }
+          deferredOperations.current = []
+        }, [])}
+        style={{
+          padding: 20,
+          border: '1px black solid',
+          // Preserve adjacent whitespace and new lines.
+          // react 渲染多个空格的时候，默认只会渲染成一个空格，这个属性允许渲染多个
+          whiteSpace: 'pre-wrap',
+        }}
       >
         <Children
           node={editor} 
@@ -198,5 +232,6 @@ export const hasEditableTarget = (
 }
 
 /**
- * beforeinput 会先于 selectionchange 执行
+ * oninput 只有在浏览器接管渲染的时候才会执行，
+ * 执行顺序 beforeinput => oninput => beforeinput
  */

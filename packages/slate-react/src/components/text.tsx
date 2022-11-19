@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Element, Text as SlateText, Range } from 'slate'
 import { useIsomorphicLayoutEffect } from "../hooks/use-isomorphic-layout-effect";
 import { useSlate } from "../hooks/use-slate";
@@ -28,7 +28,7 @@ const Text = (props: {
     }
   });
 
-  const leaves = SlateText.decorations(text, decorations)  
+  const leaves = SlateText.decorations(text, decorations);
   for (let i = 0; i < leaves.length; i++) {
     const leaf = leaves[i]
 
@@ -50,6 +50,14 @@ const Text = (props: {
   );
 };
 
-const MemoizedText = React.memo(Text);
+const MemoizedText = React.memo(Text, (prev, next) => {
+  const isMemoizedText = (
+    next.parent === prev.parent &&
+    next.renderLeaf === prev.renderLeaf &&
+    next.text === prev.text
+  );
+  
+  return isMemoizedText;
+});
 
 export default MemoizedText;

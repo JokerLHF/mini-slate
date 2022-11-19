@@ -33,7 +33,17 @@ const Leaf = (props: {
   return renderLeaf({ attributes, children, text })
 }
 
-const MemoizedLeaf = React.memo(Leaf);
+const MemoizedLeaf = React.memo(Leaf, (prev, next) => {
+  // debugger
+  const isMemoizedLeaf = (
+    next.parent === prev.parent &&
+    next.renderLeaf === prev.renderLeaf &&
+    next.text === prev.text
+    // Text.equals(next.leaf, prev.leaf) &&
+  );
+
+  return isMemoizedLeaf;
+})
 
 export const DefaultLeaf = (props: RenderLeafProps) => {
   const { attributes, children } = props
