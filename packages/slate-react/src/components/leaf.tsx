@@ -30,20 +30,10 @@ const Leaf = (props: {
     'data-slate-leaf': true,
   }
 
-  return renderLeaf({ attributes, children, text })
+  return renderLeaf({ attributes, children, leaf })
 }
 
-const MemoizedLeaf = React.memo(Leaf, (prev, next) => {
-  // debugger
-  const isMemoizedLeaf = (
-    next.parent === prev.parent &&
-    next.renderLeaf === prev.renderLeaf &&
-    next.text === prev.text
-    // Text.equals(next.leaf, prev.leaf) &&
-  );
-
-  return isMemoizedLeaf;
-})
+const MemoizedLeaf = React.memo(Leaf);
 
 export const DefaultLeaf = (props: RenderLeafProps) => {
   const { attributes, children } = props

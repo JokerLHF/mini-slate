@@ -7,7 +7,6 @@ import { ReactEditor } from '../plugin/react-editor';
 import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING } from '../utils/weak-map';
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
-import { DecorateContext } from '../hooks/use-decorate';
 
 export interface RenderElementProps {
   children: any
@@ -20,15 +19,13 @@ export interface RenderElementProps {
 
 export interface RenderLeafProps {
   children: any
-  text: Text,
+  leaf: Text,
   attributes: {
     'data-slate-leaf': true
   }
 }
 
 type DeferredOperation = () => void;
-
-export const defaultDecorate: (entry: NodeEntry) => Range[] = () => []
 
 export type EditableProps = {
   renderElement?: (props: RenderElementProps) => JSX.Element
@@ -45,13 +42,13 @@ export const Editable = (props: EditableProps) => {
   const {
     renderElement,
     renderLeaf,
-    decorate = defaultDecorate,
   } = props;
 
   const Component = 'div';
   const editor = useSlate();
   const ref = useRef<HTMLDivElement>(null);
   const deferredOperations = useRef<DeferredOperation[]>([]);
+  const decorations = [];
 
   const onDOMSelectionChange = useCallback(throttle(() => {
     // 中文环境不处理 selection, 等 compositionEnd 之后再出来    
@@ -72,8 +69,7 @@ export const Editable = (props: EditableProps) => {
     const focusNodeSelectable = hasEditableTarget(editor, focusNode);
     // 开始 & 结束节点都是 editor 中
     if (anchorNodeSelectable && focusNodeSelectable) {
-      const range = ReactEditor.toSlateRange(editor, domSelection , { exactMatch: false, suppressThrow: true });
-      
+      const range = ReactEditor.toSlateRange(editor, domSelection , { exactMatch: false, suppressThrow: true });      
       if (range) {
         Transforms.select(editor, range)
       }
@@ -205,41 +201,50 @@ export const Editable = (props: EditableProps) => {
     return () => ref.current?.removeEventListener('beforeinput', onBeforeInput);
   }, [onBeforeInput]);
   
+  // decoration 表示哪一个 range 需要标记为 mark
+  const { selection, marks } = editor;
+  if (selection && marks && Range.isCollapsed(selection)) {
+    const { anchor } = selection;
+    decorations.push({
+      anchor,
+      focus: anchor,
+      ...marks,
+    })
+  }
+  
   return (
-    <DecorateContext.Provider value={decorate}>
-      <Component
-        ref={ref}
-        contentEditable={true}
-        suppressContentEditableWarning // 给标签设置可编辑的属性contentEditable，页面会弹出警告，这个属性去除
-        data-slate-editor
-        style={{
-          padding: 20,
-          border: '1px black solid',
-          // Preserve adjacent whitespace and new lines.
-          // react 渲染多个空格的时候，默认只会渲染成一个空格，这个属性允许渲染多个
-          whiteSpace: 'pre-wrap',
-        }}
-        onInput={useCallback((event: React.SyntheticEvent) => {          
-          for (const op of deferredOperations.current) {
-            op();
-          }
-          deferredOperations.current = []
-        }, [])}
-        onCompositionUpdate={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
-          IS_COMPOSING.set(editor, true);
-        }, [editor])}
-        onCompositionEnd={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
-          IS_COMPOSING.set(editor, false);
-          Editor.insertText(editor, event.data);
-        }, [editor])}
-      >
-        <Children
-          node={editor} 
-          renderElement={renderElement}
-          renderLeaf={renderLeaf}
-        />
-      </Component>
-    </DecorateContext.Provider>
+    <Component
+      ref={ref}
+      contentEditable={true}
+      suppressContentEditableWarning // 给标签设置可编辑的属性contentEditable，页面会弹出警告，这个属性去除
+      data-slate-editor
+      style={{
+        padding: 20,
+        border: '1px black solid',
+        // react 渲染多个空格的时候，默认只会渲染成一个空格，这个属性允许渲染多个
+        whiteSpace: 'pre-wrap',
+      }}
+      onInput={useCallback((event: React.SyntheticEvent) => {          
+        for (const op of deferredOperations.current) {
+          op();
+        }
+        deferredOperations.current = []
+      }, [])}
+      onCompositionUpdate={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
+        IS_COMPOSING.set(editor, true);
+      }, [editor])}
+      onCompositionEnd={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
+        IS_COMPOSING.set(editor, false);
+        Editor.insertText(editor, event.data);
+      }, [editor])}
+    >
+      <Children
+        node={editor} 
+        renderElement={renderElement}
+        renderLeaf={renderLeaf}
+        decorations={decorations}
+      />
+    </Component>
   )
 }
 

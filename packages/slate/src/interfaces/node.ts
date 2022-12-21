@@ -28,6 +28,7 @@ export interface NodeInterface {
   isNodeList: (value: any) => boolean;
   isNode: (value: any) => boolean;
   get: (root: Node, path: Path) => Node;
+  parent: (root: Node, path: Path) => Ancestor;
   first: (root: Node, path: Path) => NodeEntry;
   last: (root: Node, path: Path) => NodeEntry;
   has:(root: Node, path: Path) => boolean;
@@ -66,6 +67,18 @@ export const Node: NodeInterface = {
 
     return node;
   },
+
+  parent(root: Node, path: Path): Ancestor {
+    const parentPath = Path.parent(path);
+    const parent = Node.get(root, parentPath);
+    if (Text.isText(parent)) {
+      throw new Error(
+        `Cannot get the parent of path [${path}] because it does not exist in the root.`
+      )
+    }
+    return parent;
+  },
+
   /**
    * 以 path 为起点向下获取最开始的 slateTextNode
    */

@@ -1,121 +1,67 @@
 import React, { useCallback, useMemo } from 'react'
-import { Editable, withReact, Slate, RenderElementProps } from 'slate-react';
+import { Editable, withReact, Slate, RenderElementProps, RenderLeafProps } from 'slate-react';
 import { createEditor, Element, Editor, Descendant, Text } from 'slate';
 
 const initialValue: Descendant[] = [
   {
     children: [
-      // { type: 'void', children: [
-      //   { text: '111' },
-      //   {text: '222'}
-      // ] },
-      // { type: 'no-inline', children: [{text: ''}] },
-      // { type: 'inline', children: [{text: '333'}] },
-      {text: '333'},
-
-      // { type: 'test', children: [{text: 'abcd'}] },
+      {text: '111'},
+      {text: '222'},
     ]
   },
 ]
 
-const widthVoid = (editor: Editor) => {
-  // const { isVoid, isInline } = editor;
 
-  // editor.isVoid = (element: Element) => {
-  //   return element.type === 'void' ? true : isVoid(element);
-  // }
-  // editor.isInline = (element: Element) => {
-  //   return element.type === 'inline' ? true : isInline(element);
-  // } 
-  (globalThis as any).editor = editor
-  return editor;
-}
+// const handleRenderElement = (props: RenderElementProps) => {
+//   const { attributes, children, element } = props
+//   switch (element.type) {
+//     case 'void':
+//       return <EditableVoid {...props} />
+//     case 'inline':
+//       return (
+//         <span {...attributes}>{children}</span>
+//       )
+//     default:
+//       return <div {...attributes}>{children}</div>
+//   }
+// }
 
-const handleRenderElement = (props: RenderElementProps) => {
-  const { attributes, children, element } = props
-  switch (element.type) {
-    case 'void':
-      return <EditableVoid {...props} />
-    case 'inline':
-      return (
-        <span {...attributes}>{children}</span>
-      )
-    default:
-      return <div {...attributes}>{children}</div>
+const Leaf = (props: RenderLeafProps) => {
+  let { attributes, children, leaf } = props;
+
+  if (leaf.bold) {
+    children = <strong>{children}</strong>
   }
+
+  if (leaf.code) {
+    children = <code>{children}</code>
+  }
+
+  if (leaf.italic) {
+    children = <em>{children}</em>
+  }
+
+  if (leaf.underline) {
+    children = <u>{children}</u>
+  }
+
+  return <span {...attributes}>{children}</span>
 }
 
-const EditableVoid = ({ attributes, children, element }) => {
-  return (
-    <div {...attributes}>
-      {children}
-      <div contentEditable={false}>
-        <img src="https://avatars.githubusercontent.com/u/40337000?v=4" />
-      </div>
-    </div>
-  )
-}
+
 const HomePage = () => {
-  const editor = useMemo(() => widthVoid(withReact(createEditor())), [])
-  // const decorate = useCallback(([node, path]) => {
+  const editor = useMemo(() => withReact(createEditor()), [])
+  const renderLeaf = useCallback(props => <Leaf {...props} />, [])
 
-  //   if (!Text.isText(node)) {
-  //     return [];
-  //   }
-  //   // 用的是 middle 的测试用例
-  //   return [
-  //     {
-  //       anchor: {
-  //         path: [0],
-  //         offset: 1,
-  //       },
-  //       focus: {
-  //         path: [0],
-  //         offset: 2,
-  //       },
-  //       decoration1: 'decoration1',
-  //     },
-  //     {
-  //       anchor: {
-  //         path: [0],
-  //         offset: 2,
-  //       },
-  //       focus: {
-  //         path: [0],
-  //         offset: 2,
-  //       },
-  //       decoration2: 'decoration2',
-  //     },
-  //     {
-  //       anchor: {
-  //         path: [0],
-  //         offset: 2,
-  //       },
-  //       focus: {
-  //         path: [0],
-  //         offset: 3,
-  //       },
-  //       decoration3: 'decoration3',
-  //     },
-  //     {
-  //       anchor: {
-  //         path: [0],
-  //         offset: 4,
-  //       },
-  //       focus: {
-  //         path: [0],
-  //         offset: 4,
-  //       },
-  //       decoration4: 'decoration4',
-  //     },
-  //   ]
-  // }, [])
+  const handleMark = useCallback(() => {
+    Editor.addMark(editor, 'bold', true);
+  }, [editor]);
 
   return (
     <Slate editor={editor} value={initialValue}>
+      <div onClick={handleMark}>点我加粗</div>
       <Editable
-        // renderElement={handleRenderElement}
-        // decorate={decorate}
+        renderLeaf={renderLeaf}
       />
     </Slate>
   )

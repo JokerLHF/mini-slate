@@ -1,3 +1,7 @@
+import produce from "immer";
+import { PathRefOptions } from "./editor";
+import { Operation } from "./operation";
+
 export type Path = number[]
 
 export interface PathInterface {
@@ -12,6 +16,12 @@ export interface PathInterface {
   isAncestor: (path: Path, another: Path) => boolean;
   isBefore: (path: Path, another: Path) => boolean;
   levels: (path: Path) => Path[];
+  transform(
+    path: Path | null,
+    op: Operation,
+    options?: PathRefOptions,
+  ): Path | null;
+  endsBefore: (path: Path, another: Path) => boolean;
 }
 
 export const Path: PathInterface = {
@@ -125,7 +135,7 @@ export const Path: PathInterface = {
   },
   /**
    * 返回 path 所有的父节点，比如[1, 2, 3]
-   * 返回 [1], [1, 2]
+   * 返回 [1], [1, 2] [1, 2, 3]
    */
   levels(path: Path): Path[] {
     const list: Path[] = []
@@ -133,5 +143,55 @@ export const Path: PathInterface = {
       list.push(path.slice(0, i));
     }
     return list;
+  },
+
+  /**
+   * [1,1] [1,2]
+   * 判断 [1,2] 是不是在 [1,1] 后面
+   */
+  endsBefore(path: Path, another: Path): boolean {
+    const i = path.length - 1
+    const as = path.slice(0, i)
+    const bs = another.slice(0, i)
+    const av = path[i]
+    const bv = another[i]
+    return Path.equals(as, bs) && av < bv
+  },
+
+  transform(
+    path: Path | null,
+    op: Operation,
+    options?: PathRefOptions,
+  ): Path | null {
+    const { affinity } = options || {};
+    return produce(path, p => {
+      if (!p) {
+        return null;
+      }
+      switch (op.type) {
+        case 'insert_node': {
+          // 指向下一个
+          p[p.length - 1] += 1;
+          break;
+        }
+        case 'split_node': {
+          const { path } = op;
+          // 自身的修改
+          if (Path.equals(path, p)) {
+            if (affinity === 'forward') {
+              p[p.length - 1] += 1
+            } else if (affinity === 'backward') {
+              // Nothing, because it still refers to the right path.
+            } else {
+              return null
+            }
+          } 
+          // 在 p 之前的 node 节点进行了 spalitNode（1分为2），p需要+1
+          else if (Path.endsBefore(path, p)) {
+            p[path.length - 1] += 1
+          }
+        }
+      }
+    });
   }
 }

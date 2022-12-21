@@ -58,6 +58,56 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       }
       break;
     }
+
+    case 'split_node': {
+      const { path, position } = op;
+      const node = Node.get(editor, path);
+      const parent = Node.parent(editor, path);
+      const index = path[path.length - 1];
+
+      if (Text.isText(node)) {
+        const before = node.text.slice(0, position);
+        const after = node.text.slice(position);
+        // 修改现有 node text
+        node.text = before;
+        // 在现有 node 后面插入新的 textNode
+        const newNode: Text = {
+          text: after
+        }
+        parent.children.splice(index + 1, 0, newNode);
+      }
+
+      break;
+    }
+
+    case 'insert_node': {
+      const { path, node } = op;
+      const parent = Node.parent(editor, path);
+      const index = path[path.length - 1];
+      parent.children.splice(index + 1, 0, node);
+              
+      // selection 指向 insertNode 的尾巴
+      if (selection) {
+        const { anchor, focus } = selection;
+        selection.anchor = Point.transform(anchor, op)!;
+        selection.focus = Point.transform(focus, op)!;
+      }
+      break;
+    }
+
+    case 'set_node': {
+      const { path, newProperties } = op;
+      const node = Node.get(editor, path);
+
+      for (const key in newProperties) {
+        const value = newProperties[key]
+        if (value === null) {
+          delete node[key];
+        } else {
+          node[key] = value;
+        }
+      }
+    }
   }
   return selection;
 }

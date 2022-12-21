@@ -28,7 +28,10 @@ const Text = (props: {
     }
   });
 
+  // 根据 decoration 将 text 拆分为多个 Leaf 并用 mark 渲染。
+  // 如果 decoration 范围不在 text 里就不需要拆分
   const leaves = SlateText.decorations(text, decorations);
+  
   for (let i = 0; i < leaves.length; i++) {
     const leaf = leaves[i]
 
@@ -50,14 +53,6 @@ const Text = (props: {
   );
 };
 
-const MemoizedText = React.memo(Text, (prev, next) => {
-  const isMemoizedText = (
-    next.parent === prev.parent &&
-    next.renderLeaf === prev.renderLeaf &&
-    next.text === prev.text
-  );
-  
-  return isMemoizedText;
-});
+const MemoizedText = React.memo(Text);
 
 export default MemoizedText;

@@ -4,12 +4,16 @@ import { Node } from './node';
 import { Operation } from "./operation";
 import { Range } from './range';
 import { Point } from './point';
-import { LeafEdge } from "./types";
+import { LeafEdge, RangeDirection, TextDirection } from "./types";
 import { Path } from "./path";
 import { Location } from './location';
 import { Text } from "./text";
 import { Element } from './element';
 import { ExtendedType } from "./custom-types";
+import { PointRef } from "./point-ref";
+import { PATH_REFS, POINT_REFS, RANGE_REFS } from "../utils/weak-maps";
+import { RangeRef } from "./range-ref";
+import { PathRef } from "./path-ref";
 
 export type BaseSelection = Range | null;
 export type Selection = ExtendedType<BaseSelection>;
@@ -42,23 +46,36 @@ export interface EditorLevelsOptions<T extends Node> {
   voids?: boolean
 }
 
+export interface PointRefOptions {
+  affinity: TextDirection | null
+}
+
+export interface RangeRefOptions {
+  affinity: RangeDirection | null
+}
+
+export interface PathRefOptions {
+  affinity: TextDirection | null
+}
+
 /**
  * slate 本身提供的
  */
 
 export interface BaseEditor {
-  children: Descendant[],
-  selection: Selection,
-  operations: Operation[],
+  children: Descendant[];
+  selection: Selection;
+  operations: Operation[];
+  marks: Record<string, any> | null;
 
   // Schema-specific node behaviors.
-  isVoid: (value: Element) => boolean,
-  onChange: () => void,
-  isInline: (element: Element) => boolean,
-  insertText: (text: string) => void,
+  onChange: () => void;
+  isInline: (element: Element) => boolean;
+  insertText: (text: string) => void;
+  addMark: (key: string, value: any) => void;
 
   // Overrideable core actions.
-  apply: (operation: Operation) => void,
+  apply: (operation: Operation) => void;
 }
 export type Editor = ExtendedType<BaseEditor>;
 
@@ -69,15 +86,40 @@ export interface EditorInterface {
   point: (editor: Editor, at: Location, options?: EditorPointOptions) => Point;
   hasPath: (editor: Editor, path: Path) => boolean;
   node: (editor: Editor, at: Location, options?: EditorNodeOptions) => NodeEntry;
-  isVoid: (editor: Editor, value: any) => value is Element;
   before: (editor: Editor,at: Location) => Point | undefined;
   positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>;
+  addMark: (editor: Editor, key: string, value: any) => void;
 
   insertText: (editor: Editor, text: string) => void;
   levels: <T extends Node>(
     editor: Editor,
     options?: EditorLevelsOptions<T>
-  ) => Generator<NodeEntry<T>, void, undefined>
+  ) => Generator<NodeEntry<T>, void, undefined>;
+
+  isEdge: (editor: Editor, point: Point, at: Location) => boolean;
+  isEnd: (editor: Editor, point: Point, at: Location) => boolean;
+  isStart: (editor: Editor, point: Point, at: Location) => boolean;
+
+  pointRef: (
+    editor: Editor,
+    point: Point,
+    options?: PointRefOptions,
+  ) => PointRef;
+  pointRefs: (editor: Editor) => Set<PointRef>;
+
+  rangeRef: (
+    editor: Editor,
+    range: Range,
+    options?: RangeRefOptions,
+  ) => RangeRef;
+  rangeRefs: (editor: Editor) => Set<RangeRef>;
+
+  pathRef: (
+    editor: Editor,
+    path: Path,
+    options?: PathRefOptions,
+  ) => PathRef;
+  pathRefs: (editor: Editor) => Set<PathRef>;
 }
 
 export const Editor: EditorInterface = {
@@ -87,17 +129,29 @@ export const Editor: EditorInterface = {
     }
     // TODO: 其他情况的考虑
     const isEditor = Node.isNodeList(value.children) 
+      && typeof value.addMark === 'function'
       && typeof value.onChange === 'function'
       && typeof value.apply === 'function'
       && typeof value.isInline === 'function'
-      && typeof value.isVoid === 'function'
       && typeof value.insertText === 'function'
       && (value.selection === null || Range.isRange(value.selection));
     return isEditor
   },
 
-  isVoid(editor: Editor, value: any): value is Element {
-    return Element.isElement(value) && editor.isVoid(value)
+  isEnd (editor: Editor, point: Point, at: Location): boolean {
+    return Editor.point(editor, at, { edge: 'end' }) === point;
+  },
+
+  isStart (editor: Editor, point: Point, at: Location): boolean {
+    return Editor.point(editor, at, { edge: 'start' }) === point;
+  },
+
+  isEdge (editor: Editor, point: Point, at: Location): boolean {
+    return Editor.isStart(editor, point, at) || Editor.isEnd(editor, point, at);
+  },
+
+  addMark(editor: Editor, key: string, value: any): void {
+    editor.addMark(key, value)
   },
 
   /**
@@ -119,7 +173,7 @@ export const Editor: EditorInterface = {
    *    edge-end:   获得从 location 结束的 textNode point
    */
   point(editor: Editor, at: Location, options: EditorPointOptions = {}): Point {
-    const { edge } = options;
+    const { edge = 'start' } = options;
     if (Path.isPath(at)) {
       let path;
 
@@ -288,5 +342,120 @@ export const Editor: EditorInterface = {
 
     // 这个是什么语法 跟 yied levels 有什么不同？？
     yield* levels;
-  }
+  },
+
+  pointRef(
+    editor: Editor,
+    point: Point,
+    options?: PointRefOptions,
+  ): PointRef {
+    const { affinity = 'forward' } = options || {};
+    const ref: PointRef = {
+      current: point,
+      affinity,
+      unref() {
+        const { current } = ref
+        const pointRefs = Editor.pointRefs(editor)
+        pointRefs.delete(ref)
+        ref.current = null
+        return current
+      },
+    }
+
+    const refs = Editor.pointRefs(editor)
+    refs.add(ref)
+    return ref
+  },
+
+  /**
+   * Get the set of currently tracked point refs of the editor.
+   */
+
+  pointRefs(editor: Editor): Set<PointRef> {
+    let refs = POINT_REFS.get(editor)
+
+    if (!refs) {
+      refs = new Set()
+      POINT_REFS.set(editor, refs)
+    }
+
+    return refs
+  },
+
+  rangeRef(
+    editor: Editor,
+    range: Range,
+    options?: RangeRefOptions,
+  ): RangeRef {
+    const { affinity = 'forward' } = options || {};
+    const ref: RangeRef = {
+      current: range,
+      affinity,
+      unref() {
+        const { current } = ref
+        const rangeRefs = Editor.rangeRefs(editor)
+        rangeRefs.delete(ref)
+        ref.current = null
+        return current
+      },
+    }
+
+    const refs = Editor.rangeRefs(editor)
+    refs.add(ref)
+    return ref
+  },
+
+  /**
+   * Get the set of currently tracked point refs of the editor.
+   */
+
+  rangeRefs(editor: Editor): Set<RangeRef> {
+    let refs = RANGE_REFS.get(editor)
+
+    if (!refs) {
+      refs = new Set()
+      RANGE_REFS.set(editor, refs)
+    }
+
+    return refs
+  },
+
+
+  pathRef(
+    editor: Editor,
+    path: Path,
+    options?: PathRefOptions,
+  ): PathRef {
+    const { affinity = 'forward' } = options || {};
+    const ref: PathRef = {
+      current: path,
+      affinity,
+      unref() {
+        const { current } = ref
+        const pathRefs = Editor.pathRefs(editor)
+        pathRefs.delete(ref)
+        ref.current = null
+        return current
+      },
+    }
+
+    const refs = Editor.pathRefs(editor)
+    refs.add(ref)
+    return ref
+  },
+
+  /**
+   * Get the set of currently tracked point refs of the editor.
+   */
+
+  pathRefs(editor: Editor): Set<PathRef> {
+    let refs = PATH_REFS.get(editor)
+
+    if (!refs) {
+      refs = new Set()
+      PATH_REFS.set(editor, refs)
+    }
+
+    return refs
+  },
 }

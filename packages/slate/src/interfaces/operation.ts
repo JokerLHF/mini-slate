@@ -1,6 +1,6 @@
 import { Range } from '../interfaces/range';
-// import { isPlainObject } from 'is-plain-object';
 import { Path } from './path';
+import { Node } from './node';
 
 export type BaseSetSelectionOperation =
   | {
@@ -19,14 +19,28 @@ export type BaseSetSelectionOperation =
     newProperties: null,
   }
 
-export type BaseInsertTextOperation = {
+export type BaseTextOperation = {
   type: 'insert_text',
   path: Path,
   offset: number,
   text: string,
 }
 
-export type Operation = BaseInsertTextOperation | BaseSetSelectionOperation;
+export type BaseNodeOperation = {
+  type: 'split_node',
+  path: Path,
+  position: number,
+} | {
+  type: 'insert_node',
+  node: Node,
+  path: Path,
+} | {
+  type: 'set_node',
+  path: Path,
+  newProperties: Partial<Node>,
+}
+
+export type Operation = BaseTextOperation | BaseSetSelectionOperation | BaseNodeOperation;
 
 /**
  * slate 本身提供的

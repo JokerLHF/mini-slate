@@ -1,6 +1,9 @@
 import { Point } from "./point"
 import { isPlainObject } from 'is-plain-object';
 import { ExtendedType } from "./custom-types";
+import { Operation } from "./operation";
+import { RangeRefOptions } from "./editor";
+import produce from "immer";
 
 export interface BaseRange {
   anchor: Point
@@ -10,13 +13,19 @@ export interface BaseRange {
 export type Range = ExtendedType<BaseRange>;
 
 export interface RangeInterface {
-  isRange: (value: any) => value is Range,
-  isBackward: (range: Range) => boolean,
-  edges: (range: Range) => [Point, Point],
-  start: (range: Range) => Point,
-  end: (range: Range) => Point,
-  isCollapsed: (range: Range) => boolean,
+  isRange: (value: any) => value is Range;
+  isBackward: (range: Range) => boolean;
+  edges: (range: Range) => [Point, Point];
+  start: (range: Range) => Point;
+  end: (range: Range) => Point;
+  isCollapsed: (range: Range) => boolean;
+  transform: (
+    range: Range,
+    op: Operation,
+    options?: RangeRefOptions,
+  ) => Range | null
 }
+
 export const Range: RangeInterface = {
   isRange(value: any): value is Range {
     return (
@@ -64,4 +73,46 @@ export const Range: RangeInterface = {
   isCollapsed(range): boolean {
     return Point.equals(range.anchor, range.focus);
   },
+
+  transform: (
+    range: Range | null,
+    op: Operation,
+    options?: RangeRefOptions,
+  ): Range | null => {
+    return produce(range, (r: Range | null) => {
+      if (!r) {
+        return null;
+      }
+      const { affinity = 'inward' } = options || {};
+      let affinityAnchor: 'forward' | 'backward' | null = null;
+      let affinityFocus: 'forward' | 'backward' | null = null;
+      const isCollapsed = Range.isCollapsed(r);
+      if (affinity === 'inward') {
+        // range 从后到前
+        if (Range.isBackward(r)) {
+          // 开始节点保持不变
+          affinityAnchor = 'backward';
+          // 结束节点指向下一个
+          affinityFocus = isCollapsed ? 'backward' : 'forward';
+        } else {
+          // 开始节点指向下一个节点
+          affinityAnchor = 'forward';
+          // 结束节点保持不变
+          affinityFocus = isCollapsed ? 'forward' : 'backward';
+        }
+      } else {
+        // TODO
+      }
+      const anchor = Point.transform(r.anchor, op, { affinity: affinityAnchor })
+      const focus = Point.transform(r.focus, op, { affinity: affinityFocus })
+
+      if (!anchor || !focus) {
+        return null
+      }
+
+      r.anchor = anchor
+      r.focus = focus
+    })
+  },
+
 }

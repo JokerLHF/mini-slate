@@ -3,6 +3,7 @@ import { isPlainObject } from 'is-plain-object';
 import { ExtendedType } from "./custom-types";
 import { Operation } from "./operation";
 import produce from "immer";
+import { PointRefOptions } from "./editor";
 
 export interface BasePoint {
   path: Path
@@ -19,6 +20,7 @@ export interface PointInterface {
   transform: (
     point: Point,
     op: Operation,
+    options?: PointRefOptions,
   ) => Point | null
 }
 
@@ -60,18 +62,44 @@ export const Point: PointInterface = {
   transform(
     point: Point | null,
     op: Operation,
+    options?: PointRefOptions,
   ): Point | null {
+    const { affinity } = options || {};
     return produce(point, p => {
       if (!p) {
         return null;
       }
+      const { path } = p;
+
       switch (op.type) {
-        case 'insert_text':
+        case 'insert_text': {
+          // 指向 insertText 的位置
           const { path, text, offset } = op;
           if (Path.equals(path, p.path) && p.offset === offset) {
             p.offset += text.length
           }
           break;
+        }
+        case 'split_node': {
+          // 自身的 op 需要改变 offset
+          if (Path.equals(op.path, path)) {
+            // point 需要向前的需要修改 offset 和 path
+            // point 不需要向前的，不处理
+            if (op.position === p.offset && affinity === 'forward') {
+              p.offset -= op.position;
+              p.path = Path.transform(path, op, { affinity: 'forward' })!;
+            }
+          } else {
+            p.path = Path.transform(path, op)!;
+          }               
+          break;
+        }
+        case 'insert_node': {
+          // 指向 insertNode 的尾巴
+          p.path = Path.transform(path, op)!;
+          p.offset = op.node.text.length;
+          break;
+        }
       }
     })
   }
