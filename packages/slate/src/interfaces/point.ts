@@ -59,12 +59,15 @@ export const Point: PointInterface = {
     return Path.equals(point.path, another.path) && point.offset == another.offset;
   },
 
+  /**
+   * 在这个 op 下，point 应该如何装换
+   */
   transform(
     point: Point | null,
     op: Operation,
     options?: PointRefOptions,
   ): Point | null {
-    const { affinity } = options || {};
+    const { affinity = 'forward' } = options || {};
     return produce(point, p => {
       if (!p) {
         return null;
@@ -90,14 +93,25 @@ export const Point: PointInterface = {
               p.path = Path.transform(path, op, { affinity: 'forward' })!;
             }
           } else {
-            p.path = Path.transform(path, op)!;
-          }               
+            p.path = Path.transform(path, op, options)!;
+          }
           break;
         }
         case 'insert_node': {
           // 指向 insertNode 的尾巴
           p.path = Path.transform(path, op)!;
-          p.offset = op.node.text.length;
+          break;
+        }
+        case 'merge_node': {
+          /**
+           * A,B 两个节点，B mergeTo A，
+           * 此时 B 的 offset 应该变为 A.length+B.length, 
+           * B 的 path 应该变为 A 的 path
+           */
+          if (Path.equals(op.path, path)) {
+            p.offset += op.position;
+          }
+          p.path = Path.transform(path, op)!;
           break;
         }
       }

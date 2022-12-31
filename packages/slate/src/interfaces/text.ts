@@ -1,6 +1,7 @@
 import { isPlainObject } from 'is-plain-object';
 import { ExtendedType } from './custom-types';
 import { Range } from './range';
+import { isEqual, omit } from 'lodash';
 
 export interface BaseText {
   text: string
@@ -8,16 +9,27 @@ export interface BaseText {
 
 export type Text = ExtendedType<BaseText>;
 
+interface TextEqualsOptions {
+  isEqualText?: boolean;
+}
 /**
  * slate 本身提供的
  */
-
 export interface TextInterface {
   isText: (value: any) => value is Text;
   decorations: (node: Text, decorations: Range[]) => Text[];
+  equals: (text: Text, another: Text, options?: TextEqualsOptions) => boolean
 }
 
 export const Text: TextInterface = {
+  equals(text: Text, another: Text, options?: TextEqualsOptions) {
+    const { isEqualText = true } = options || {};
+
+    return isEqualText 
+      ? isEqual(text, another)
+      : isEqual(omit(text, 'text'), omit(another, 'text')) 
+  },
+
   isText(value: any): value is Text {
     return isPlainObject(value) && typeof value.text === 'string';
   },

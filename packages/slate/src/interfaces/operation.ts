@@ -38,6 +38,13 @@ export type BaseNodeOperation = {
   type: 'set_node',
   path: Path,
   newProperties: Partial<Node>,
+}| {
+  type: 'merge_node',
+  path: Path,
+  position: number,
+}| {
+  type: 'remove_node',
+  path: Path,
 }
 
 export type Operation = BaseTextOperation | BaseSetSelectionOperation | BaseNodeOperation;

@@ -1,10 +1,15 @@
 import { Editor } from "./interfaces/editor";
+import { Element } from "./interfaces/element";
+import { NodeEntry } from "./interfaces/node";
 import { Operation } from "./interfaces/operation";
+import { Path } from "./interfaces/path";
 import { PathRef } from "./interfaces/path-ref";
 import { PointRef } from "./interfaces/point-ref";
 import { Range } from "./interfaces/range";
 import { RangeRef } from "./interfaces/range-ref";
+import { Text } from "./interfaces/text";
 import { Transforms } from "./transforms";
+import { DIRTY_PATHS, DIRTY_PATHS_KEYS } from "./utils/weak-maps";
 
 export const createEditor = (): Editor => {
   const editor: Editor = {
@@ -58,7 +63,40 @@ export const createEditor = (): Editor => {
         PathRef.transform(pathRef, op);
       }
 
+      const dirtyPaths: Path[] = [];
+      const dirtyPathKeys: Set<string> = new Set();
+
+      const add = (path: Path | null) => {
+        if (!path) {
+          return;
+        }
+        const key = path.join(',');
+        if (!dirtyPathKeys.has(key)) {
+          dirtyPathKeys.add(key);
+          dirtyPaths.push(path);
+        }
+      }
+
+      const oldDirtyPath = DIRTY_PATHS.get(editor) || [];
+      for (const oldPath of oldDirtyPath) {
+         /**
+         * 对于前几次 apply 产生的 path，需要重新 transform。因为当前 op 可能会对之前的 path 产生影响
+         * 比如 [111，222] 2个节点， 选择12进行加粗，此时的path是[11,1,2,22] dirtyPath(split_node)是 [1,2,22]
+         * 因为[1,2] 可以合并为一个，所以合并之后 dirtyPath [22] 的 path 需要重新计算一遍
+         */
+        const newPath = Path.transform(oldPath, op);
+        add(newPath);
+      }
+
+      const newDirtyPaths = editor.getDirtyPaths(op)
+      for (const path of newDirtyPaths) {
+        add(path)
+      }
+
       editor.operations.push(op);
+      DIRTY_PATHS.set(editor, dirtyPaths)
+      DIRTY_PATHS_KEYS.set(editor, dirtyPathKeys)
+
       Transforms.transform(editor, op);
 
       // 失焦的时候取消 marks
@@ -66,10 +104,85 @@ export const createEditor = (): Editor => {
         editor.marks = null;
       }
 
-      editor.onChange();
-      editor.operations = [];
+      // 多次 apply 可以合并为一次 onchange，使用 promise
+      Promise.resolve().then(() => {
+        editor.onChange();
+        editor.operations = [];
+      });
     },
-  }
+
+    /**
+     * 什么才能算脏路径？
+     * 可以想象文档是一个immer，对于某一处的修改会影响到的路径就是脏路径
+     */
+    getDirtyPaths(op: Operation) {
+      switch(op.type) {
+        case 'split_node': {
+          const { path } = op;
+          const ancestor = Path.levels(path);
+          const nextPath = Path.next(path);
+          return [...ancestor, nextPath];
+        }
+        case 'insert_text':
+        case 'set_node': {
+          const { path } = op;
+          return Path.levels(path);
+        }
+        case 'insert_node': {
+          const { path } = op;
+          return Path.levels(path);
+        }
+        // merge 是往前 merge
+        case 'merge_node': {
+          const { path } = op;
+          const ancestors = Path.ancestors(path);
+          const prev = Path.previous(path);
+          return [prev, ...ancestors];
+        }
+        case 'remove_node': {
+          const { path } = op;
+          return Path.ancestors(path);
+        }
+        default:
+          return [];
+      }
+    },
+
+    /**
+     * 规则1: 删除空白的文本节点
+     * 规则2: 相同的文本节点可以合并
+     */
+    normalizeNode: (entry: NodeEntry) => {      
+      const [node, path] = entry;
+      if (Text.isText(node)) {
+        return;
+      }
+
+      let i = 0;
+      for (; i < node.children.length; i++) {
+        const prev = node.children[i - 1];
+        const child = node.children[i];
+        if (Text.isText(child)) {
+          if (Text.isText(prev) && Text.equals(child, prev, { isEqualText: false })) {
+            // 前后相同可以合并
+            Transforms.mergeNodes(editor, {
+              at: path.concat(i),
+              position: prev.text.length,
+            });
+          } else if (child.text === '') {
+            // 自己是空可以删除
+            Transforms.removeNode(editor, {
+              at: path.concat(i)
+            });
+          }
+        } else if (Element.isElement(child)) {
+          // TODO
+        }
+      }
+    }
+  };
+
+  (globalThis as any).editor = editor;
 
   return editor;
 }

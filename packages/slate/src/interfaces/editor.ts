@@ -11,7 +11,7 @@ import { Text } from "./text";
 import { Element } from './element';
 import { ExtendedType } from "./custom-types";
 import { PointRef } from "./point-ref";
-import { PATH_REFS, POINT_REFS, RANGE_REFS } from "../utils/weak-maps";
+import { DIRTY_PATHS, DIRTY_PATHS_KEYS, NORMALIZING, PATH_REFS, POINT_REFS, RANGE_REFS } from "../utils/weak-maps";
 import { RangeRef } from "./range-ref";
 import { PathRef } from "./path-ref";
 
@@ -76,7 +76,10 @@ export interface BaseEditor {
 
   // Overrideable core actions.
   apply: (operation: Operation) => void;
+  getDirtyPaths: (op: Operation) => Path[];
+  normalizeNode: (entry: NodeEntry) => void;
 }
+
 export type Editor = ExtendedType<BaseEditor>;
 
 export interface EditorInterface {
@@ -120,6 +123,12 @@ export interface EditorInterface {
     options?: PathRefOptions,
   ) => PathRef;
   pathRefs: (editor: Editor) => Set<PathRef>;
+
+  getDirtyPaths: (op: Operation) => Path[];
+  isNormalizing: (editor: Editor) => boolean;
+  setNormalizing: (editor: Editor, isNormalizing: boolean) => void;
+  withoutNormalizing: (editor: Editor, fn: () => void) => void;
+  normalize: (editor: Editor) => void;
 }
 
 export const Editor: EditorInterface = {
@@ -134,16 +143,23 @@ export const Editor: EditorInterface = {
       && typeof value.apply === 'function'
       && typeof value.isInline === 'function'
       && typeof value.insertText === 'function'
+      && typeof value.getDirtyPaths === 'function'
       && (value.selection === null || Range.isRange(value.selection));
     return isEditor
   },
 
+  getDirtyPaths (op: Operation) {
+    return Editor.getDirtyPaths(op);
+  },
+
   isEnd (editor: Editor, point: Point, at: Location): boolean {
-    return Editor.point(editor, at, { edge: 'end' }) === point;
+    const end =  Editor.point(editor, at, { edge: 'end' });
+    return Point.equals(end, point);
   },
 
   isStart (editor: Editor, point: Point, at: Location): boolean {
-    return Editor.point(editor, at, { edge: 'start' }) === point;
+    const start =  Editor.point(editor, at, { edge: 'start' });
+    return Point.equals(start, point);
   },
 
   isEdge (editor: Editor, point: Point, at: Location): boolean {
@@ -203,7 +219,10 @@ export const Editor: EditorInterface = {
   },
   
   /**
-   * 从 location 中获取 textNode path
+   * 从 location 中获取 path
+   *  1. 对于 path 如果有指定边界（最左边，最右边），则获取对应的 TextPath， 无则直接返回 path
+   *  2. 对于 range 如果有指定边界（最左边，最右边），则获取对应的 TextPath， 无则获取共同的祖先
+   *  3. point 直接返回TextPath，
    */
   path(editor: Editor, at: Location, options: EditorPathOptions = {}): Path {
     const { edge } = options;
@@ -240,7 +259,7 @@ export const Editor: EditorInterface = {
   },
 
   /**
-   * 根据 location 找到 slateTextNode slateTextPath
+   * 根据 location 找到 slateTextNode
    */
   node(
     editor: Editor,
@@ -458,4 +477,44 @@ export const Editor: EditorInterface = {
 
     return refs
   },
+
+  isNormalizing(editor) {
+    const isNormalizing = NORMALIZING.get(editor)
+    return isNormalizing === undefined ? true : isNormalizing
+  },
+
+  setNormalizing(editor: Editor, isNormalizing: boolean): void {
+    NORMALIZING.set(editor, isNormalizing);
+  },
+
+  withoutNormalizing(editor: Editor, fn: () => void): void {
+    const value = Editor.isNormalizing(editor);
+    Editor.setNormalizing(editor, false);
+    try {
+      fn()
+    } finally {
+      Editor.setNormalizing(editor, value);
+    }
+    Editor.normalize(editor);
+  },
+
+  normalize(editor: Editor): void {
+    if (!Editor.isNormalizing(editor)) {
+      return;
+    }
+
+    const dirtyPath = DIRTY_PATHS.get(editor) || [];    
+    const dirtyPathKeys = DIRTY_PATHS_KEYS.get(editor) || new Set();
+
+    let path: Path | undefined = undefined;
+    // 不断的消耗 dirty_path
+    while ((path = dirtyPath.pop())) {
+      // 1. 获取 dirtyPath
+      const key = path.join(',');
+      dirtyPathKeys.delete(key);
+      const nodeEntry = Editor.node(editor, path);
+
+      editor.normalizeNode(nodeEntry);
+    }
+  }
 }

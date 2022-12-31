@@ -35,14 +35,13 @@ export const SelectionTransforms: SelectionTransforms = {
    * 为 editor 设置空的 selection
    */
   deselect(editor: Editor) {
-    const { selection } = editor
-
+    const { selection } = editor;
     if (selection) {
       editor.apply({
         type: 'set_selection',
         properties: selection,
         newProperties: null,
-      })
+      });
     }
   },
   /**

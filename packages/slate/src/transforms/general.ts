@@ -5,6 +5,7 @@ import { Range } from '../interfaces/range';
 import { Node } from '../interfaces/node';
 import { Text } from "../interfaces/text";
 import { Point } from "../interfaces/point";
+import { Path } from "../interfaces/path";
 
 export interface GeneralTransforms {
   transform: (editor: Editor, op: Operation) => void
@@ -77,6 +78,12 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
         parent.children.splice(index + 1, 0, newNode);
       }
 
+      // splitNode 的 selection 会指向分割出来的那一个开头
+      if (selection) {
+        const { anchor, focus } = selection;
+        selection.anchor = Point.transform(anchor, op)!;
+        selection.focus = Point.transform(focus, op)!;
+      }
       break;
     }
 
@@ -84,7 +91,7 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       const { path, node } = op;
       const parent = Node.parent(editor, path);
       const index = path[path.length - 1];
-      parent.children.splice(index + 1, 0, node);
+      parent.children.splice(index, 0, node);
               
       // selection 指向 insertNode 的尾巴
       if (selection) {
@@ -107,6 +114,40 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
           node[key] = value;
         }
       }
+      break;
+    }
+    case 'remove_node': {
+      const { path } = op;
+      const parent = Node.parent(editor, path);
+      const index = path[path.length - 1];
+      parent.children.splice(index, 1);
+      // 这里把 node 删除之后还需要重新设置 selection
+      if (selection) {
+        // TODO
+      }
+      break;
+    }
+    case 'merge_node': {
+      const { path } = op;
+      const parent = Node.parent(editor, path);
+      const index = path[path.length - 1];
+
+      const currentNode = Node.get(editor, path);
+      const prevPath = Path.previous(path);
+      const prevNode = Node.get(editor, prevPath);
+
+      if (Text.isText(prevNode) && Text.isText(currentNode)) {
+        // 两个 text 合并，text 合并到前一个，并且删掉当前 textNode
+        prevNode.text += currentNode.text;
+        parent.children.splice(index, 1);
+      }
+
+      if (selection) {
+        const { anchor, focus } = selection;
+        selection.anchor = Point.transform(anchor, op)!;
+        selection.focus = Point.transform(focus, op)!;
+      }
+      break;
     }
   }
   return selection;
