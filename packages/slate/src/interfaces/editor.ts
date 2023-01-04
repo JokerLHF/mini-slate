@@ -72,6 +72,9 @@ export interface BaseEditor {
   onChange: () => void;
   isInline: (element: Element) => boolean;
   insertText: (text: string) => void;
+  deleteBackward: () => void;
+  deleteFragment: () => void;
+
   addMark: (key: string, value: any) => void;
 
   // Overrideable core actions.
@@ -94,6 +97,9 @@ export interface EditorInterface {
   addMark: (editor: Editor, key: string, value: any) => void;
 
   insertText: (editor: Editor, text: string) => void;
+  deleteBackward: (editor: Editor) => void;
+  deleteFragment: (editor: Editor) => void;
+
   levels: <T extends Node>(
     editor: Editor,
     options?: EditorLevelsOptions<T>
@@ -144,6 +150,7 @@ export const Editor: EditorInterface = {
       && typeof value.isInline === 'function'
       && typeof value.insertText === 'function'
       && typeof value.getDirtyPaths === 'function'
+      && typeof value.normalizeNode === 'function'
       && (value.selection === null || Range.isRange(value.selection));
     return isEditor
   },
@@ -241,7 +248,7 @@ export const Editor: EditorInterface = {
       if (edge === 'start') {
         at = Range.start(at);
       } else if (edge === 'end') {
-        at = Range.start(at);
+        at = Range.end(at);
       } else {
         at = Path.common(at.anchor.path, at.focus.path)
       }
@@ -280,30 +287,49 @@ export const Editor: EditorInterface = {
       return;
     }
 
-    const first = Editor.path(editor, at, { edge: 'start' });
-    const last = Editor.path(editor, at, { edge: 'end' });
+    const firstPath = Editor.path(editor, at, { edge: 'start' });
+    const lastPath = Editor.path(editor, at, { edge: 'end' });
+  
+    const range = Editor.range(editor, at);
+    const [start, end] = Range.edges(range);
+  
+    for (const textEntry of Node.texts(editor, { from: lastPath, to: firstPath, reverse })) {
+      const [textNode, textNodePath] = textEntry;      
+      if (reverse) {
+        let offset = textNode.text.length;
+        while(true) {
+          if (offset > end.offset) {
+            offset--;
+            continue;
+          }
+          if (offset < start.offset) {
+            break;
+          }
+          yield { path: textNodePath, offset }
+          offset--;
+        }
+        return;
+      }
 
-    for (const textEntry of Node.texts(editor, { from: first, to: last, reverse })) {
-      const [textNode, textNodePath] = textEntry;
-
-      let distance = 0;
-      let offset = reverse ? textNode.text.length : 0;
-
+      let offset = 0;
       while(true) {
-        if (distance > textNode.text.length) {
+        // 在开始point之前不参与
+        if (offset < start.offset) {
+          offset++;
+          continue;
+        }
+        // 在结束point之后表示
+        if (offset > textNode.text.length - end.offset) {
           break;
         }
-
         yield { path: textNodePath, offset }
-
-        reverse ? offset-- : offset++;
-        distance++;
+        offset++;
       }
     }
   },
 
   /**
-   * 根据 location 返回上一个 point
+   * 根据 location 返回上一步 point
    */
   before(editor: Editor, at: Location): Point | undefined {
     const distance = 1;
@@ -319,7 +345,7 @@ export const Editor: EditorInterface = {
       at: range,
       reverse: true
     })) {
-      if (d >= distance) {
+      if (d > distance) {
         break;
       }
 
@@ -333,6 +359,14 @@ export const Editor: EditorInterface = {
 
   insertText(editor: Editor, text: string) {
     editor.insertText(text);
+  },
+
+  deleteBackward(editor: Editor): void {
+    editor.deleteBackward();
+  },
+
+  deleteFragment(editor: Editor): void {
+    editor.deleteFragment();
   },
 
   *levels<T extends Node>(
@@ -479,25 +513,36 @@ export const Editor: EditorInterface = {
   },
 
   isNormalizing(editor) {
-    const isNormalizing = NORMALIZING.get(editor)
-    return isNormalizing === undefined ? true : isNormalizing
+    const isNormalizing = NORMALIZING.get(editor);
+    return isNormalizing === undefined ? true : isNormalizing;
   },
 
   setNormalizing(editor: Editor, isNormalizing: boolean): void {
     NORMALIZING.set(editor, isNormalizing);
   },
 
+  /**
+   * 调用 Transform 之后都会调用 normalize 格式化一下文档数据结构。
+   * 但是 Transform 中有可能会调用 Transform，这个时候就会造成两次 normalize。
+   * 会造成没有必要造成浪费，或者 死循环
+   * 
+   * withoutNormalizing 作用在于：被其包括的函数，只会调用一次 normalize。
+   */
   withoutNormalizing(editor: Editor, fn: () => void): void {
     const value = Editor.isNormalizing(editor);
     Editor.setNormalizing(editor, false);
     try {
-      fn()
+      fn();
     } finally {
       Editor.setNormalizing(editor, value);
     }
     Editor.normalize(editor);
   },
 
+  /**
+   * 这里有隐藏的死循环的危险，一开始 withoutNormalizing 存储的 value=true，等到调用 normalize 时，此时如果存在 dirtyPath，
+   * 那就会不断通过 normalizeNode 消耗掉，会不会存在没有消耗完的场景呢？不是很清楚，但是作者限制了最多只能 while 循环 dirtyPath * 42 次避免死循环
+   */
   normalize(editor: Editor): void {
     if (!Editor.isNormalizing(editor)) {
       return;
@@ -505,16 +550,22 @@ export const Editor: EditorInterface = {
 
     const dirtyPath = DIRTY_PATHS.get(editor) || [];    
     const dirtyPathKeys = DIRTY_PATHS_KEYS.get(editor) || new Set();
-
     let path: Path | undefined = undefined;
-    // 不断的消耗 dirty_path
-    while ((path = dirtyPath.pop())) {
-      // 1. 获取 dirtyPath
-      const key = path.join(',');
-      dirtyPathKeys.delete(key);
-      const nodeEntry = Editor.node(editor, path);
 
-      editor.normalizeNode(nodeEntry);
+    if (dirtyPath.length === 0) {
+      return
     }
+
+    Editor.withoutNormalizing(editor, () => {
+      // 不断的消耗 dirty_path
+      while ((path = dirtyPath.pop())) {
+        // 1. 获取 dirtyPath
+        const key = path.join(',');
+        dirtyPathKeys.delete(key);
+        const nodeEntry = Editor.node(editor, path);
+  
+        editor.normalizeNode(nodeEntry);
+      };
+    });
   }
 }

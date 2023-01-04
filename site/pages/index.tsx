@@ -7,6 +7,7 @@ const initialValue: Descendant[] = [
     children: [
       {text: '111'},
       {text: '222'},
+      {text: '333'},
     ]
   },
 ]

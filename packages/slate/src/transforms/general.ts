@@ -60,6 +60,22 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       break;
     }
 
+    case 'remove_text': {
+      const { path, offset, text } = op;
+      const node = Node.get(editor, path);
+      const before = node.text.slice(0, offset);
+      const after = node.text.slice(offset + text.length);
+      node.text = before + after;
+
+      if (selection) {
+        const { anchor, focus } = selection;
+        selection.anchor = Point.transform(anchor, op)!;
+        selection.focus = Point.transform(focus, op)!;
+      }
+
+      break;
+    }
+
     case 'split_node': {
       const { path, position } = op;
       const node = Node.get(editor, path);
@@ -122,8 +138,16 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       const index = path[path.length - 1];
       parent.children.splice(index, 1);
       // 这里把 node 删除之后还需要重新设置 selection
+      // 这里的 selection 还挺复杂的
       if (selection) {
-        // TODO
+        for (const [point, key] of Range.points(selection)) {
+          const result = Point.transform(point, op)!;
+          if (selection && result !== null) {
+            selection[key] = result;
+          } else {
+            selection = null;
+          }
+        }
       }
       break;
     }

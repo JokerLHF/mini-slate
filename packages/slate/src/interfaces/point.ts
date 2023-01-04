@@ -11,6 +11,7 @@ export interface BasePoint {
 }
 
 export type Point = ExtendedType<BasePoint>;
+export type PointEntry = [Point, 'anchor' | 'focus'];
 
 export interface PointInterface {
   isPoint: (value: any) => value is Point,
@@ -83,6 +84,17 @@ export const Point: PointInterface = {
           }
           break;
         }
+        case 'remove_text': {
+          const { path } = op;
+          /**
+           * 12|3
+           * 从23交界处删除一个字符，此时的 op.offset 是 1， path.offset 是2
+           */
+          if (Path.equals(path, p.path) && op.offset <= p.offset) {
+            p.offset -= p.offset - op.offset;
+          }
+          break;
+        }
         case 'split_node': {
           // 自身的 op 需要改变 offset
           if (Path.equals(op.path, path)) {
@@ -100,6 +112,17 @@ export const Point: PointInterface = {
         case 'insert_node': {
           // 指向 insertNode 的尾巴
           p.path = Path.transform(path, op)!;
+          break;
+        }
+        case 'remove_node': {
+          /**
+           * 如果 point 是本身或者在其父节点，
+           */
+          if (Path.equals(op.path, path) || Path.isAncestor(op.path, path)) {
+            return null;
+          }
+
+          p.path = Path.transform(path, op, options)!;
           break;
         }
         case 'merge_node': {

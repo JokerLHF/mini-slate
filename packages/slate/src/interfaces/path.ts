@@ -9,6 +9,7 @@ export interface PathInterface {
   compare: (path: Path, another: Path) => -1 | 0 | 1;
   equals: (path: Path, another: Path) => boolean;
   common: (path: Path, another: Path) => Path;
+  isCommon: (path: Path, another: Path) => boolean;
   next: (path: Path) => Path;
   previous: (path: Path) => Path;
   parent: (path: Path) => Path;
@@ -92,6 +93,11 @@ export const Path: PathInterface = {
     }
 
     return common
+  },
+
+  // path 是 another 祖先或者相等
+  isCommon(path: Path, another: Path): boolean {
+    return path.length <= another.length && Path.compare(path, another) === 0
   },
 
   /**
@@ -192,6 +198,17 @@ export const Path: PathInterface = {
           }
           break;
         }
+        case 'remove_node': {
+          // op本身或者是
+          if (Path.equals(op.path, p) || Path.isAncestor(op.path, p)) {
+            return null;
+          }
+          // op 在 path 前面，删除掉 op 之后，path 要对应减1
+          if (Path.endsBefore(op.path, p)) {
+            p[p.length - 1] -= 1;
+          }
+          break;
+        }
         case 'split_node': {
           const { path } = op;
           // 自身的修改
@@ -211,6 +228,18 @@ export const Path: PathInterface = {
         }
         case 'merge_node': {
           if (Path.equals(op.path, p) || Path.endsBefore(op.path, p)) {
+            p[p.length - 1] -= 1;
+          }
+          break;
+        }
+        case 'remove_node': {
+          /**
+           * 如果 path 是本身或者在其父节点，
+           */
+          if (Path.equals(op.path, p) || Path.isAncestor(op.path, p)) {
+            return null
+          } else if (Path.endsBefore(op.path, p)) {
+           // 如果删除的 op.path 在 p 左边，那么对于 p 需要 -1
             p[p.length - 1] -= 1;
           }
           break;

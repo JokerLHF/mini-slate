@@ -1,12 +1,13 @@
 import { Transforms } from ".";
 import { Editor } from "../interfaces/editor";
+import { Location } from "../interfaces/location";
 import { Node } from '../interfaces/node';
 import { Path } from "../interfaces/path";
 import { Point } from "../interfaces/point";
 import { Range } from "../interfaces/range";
 
 export interface NodeTransforms {
-  insertNode: (editor: Editor, node: Node, options?: { select?: boolean; }) => void;
+  insertNode: (editor: Editor, node: Node, options?: { select?: boolean; at?: Location }) => void;
   splitNodes: (editor: Editor, options: { at: Point }) => void;
   setNode: (editor: Editor, props: Partial<Node>) => void;
   mergeNodes: (editor: Editor, options: { at: Path, position: number } ) => void;
@@ -30,13 +31,28 @@ export const NodeTransforms: NodeTransforms = {
     });
   },
 
-  insertNode: (editor: Editor, node: Node, options?: { select?: boolean; }) => {
+  insertNode: (
+    editor: Editor,
+    node: Node,
+    options?: { select?: boolean; at?: Location }
+  ) => {
     Editor.withoutNormalizing(editor, () => {
-      const { select = true } = options || {}
-      const { selection } = editor;
-      // 只处理光标闭合的情况
-      if (Range.isRange(selection) && Range.isCollapsed(selection)) {
-        const at = selection.anchor;
+      let { select = true, at = editor.selection} = options || {}
+      /**
+       * 1. 将 at 处理成 path
+       */
+      if (Range.isRange(at)) {
+        if (Range.isCollapsed(at)) {
+          at = at.anchor;
+        } else {
+          // 把对应的文本删除，随后插入
+          const [, end] = Range.edges(at);
+          const pointRef = Editor.pointRef(editor, end);
+          Transforms.delete(editor, { at });
+          at = pointRef.unref()!;
+        }
+      }
+      if (Point.isPoint(at)) {
         const isAtEnd = Editor.isEdge(editor, at, at.path);
         
         // 1. 先将 node 按照 at 位置分割
@@ -45,20 +61,25 @@ export const NodeTransforms: NodeTransforms = {
         const path = pathRef.unref()!;
              
         // 如果是在节点的边缘插入插入新节点，因为在边缘节点不会去 splitNode，所以此时的 path 的值不会改变，所以需要手动指向 next
-        const newPath = isAtEnd ? Path.next(path) : path;
+        at = isAtEnd ? Path.next(path) : path;
+      }
 
-        // 2. 将 node 插入到 at 的位置
-        editor.apply({
-          type: 'insert_node',
-          node,
-          path: newPath,
-        });
+      /**
+       * 2. 将 node 插入到 at 的位置
+       */
+      if (!at) {
+        return;
+      }
+      editor.apply({
+        type: 'insert_node',
+        node,
+        path: at,
+      });
 
-        // 3. 光标选中到插入的节点
-        if (select) {
-          const point = Editor.point(editor, newPath, { edge: 'end' });
-          Transforms.select(editor, point);
-        }
+      // 3. 光标选中到插入的节点
+      if (select) {
+        const point = Editor.point(editor, at, { edge: 'end' });
+        Transforms.select(editor, point);
       }
     });
   },

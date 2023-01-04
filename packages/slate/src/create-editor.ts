@@ -1,6 +1,6 @@
 import { Editor } from "./interfaces/editor";
 import { Element } from "./interfaces/element";
-import { NodeEntry } from "./interfaces/node";
+import { Descendant, Node, NodeEntry } from "./interfaces/node";
 import { Operation } from "./interfaces/operation";
 import { Path } from "./interfaces/path";
 import { PathRef } from "./interfaces/path-ref";
@@ -34,6 +34,20 @@ export const createEditor = (): Editor => {
       }
 
       editor.marks = null;
+    },
+
+    deleteBackward() {
+      const { selection } = editor;
+      if (selection && Range.isCollapsed(selection)) {
+        Transforms.delete(editor);
+      }
+    },
+
+    deleteFragment() {
+      const { selection } = editor;
+      if (selection && !Range.isCollapsed(selection)) {
+        Transforms.delete(editor);
+      }
     },
 
     addMark: (key: string, value: any) => {
@@ -124,6 +138,7 @@ export const createEditor = (): Editor => {
           return [...ancestor, nextPath];
         }
         case 'insert_text':
+        case 'remove_text':
         case 'set_node': {
           const { path } = op;
           return Path.levels(path);
@@ -152,28 +167,55 @@ export const createEditor = (): Editor => {
      * 规则1: 删除空白的文本节点
      * 规则2: 相同的文本节点可以合并
      */
-    normalizeNode: (entry: NodeEntry) => {      
+    normalizeNode: (entry: NodeEntry) => {    
       const [node, path] = entry;
       if (Text.isText(node)) {
         return;
       }
 
-      let i = 0;
-      for (; i < node.children.length; i++) {
-        const prev = node.children[i - 1];
+      /**
+       * 规则1：所有 element 都至少保证一个 text 子节点
+       */
+      if (Element.isElement(node) && node.children.length === 0) {
+        const child = { text: '' };
+        Transforms.insertNode(editor, child, {
+          at: path.concat(0),
+        })
+        return
+      }
+
+      /**
+       * 为什么要引入 n 这个变量呢？比如现在 node.children 值为 [1,2,3,4,5]
+       * 遍历到2的时候要把1，2合并，那么此时的 editor.children 就变为[12,3,4,5]
+       * 合并之后还是继续遍历  node.children，此时通过 n 拿到正确的 prev
+       */
+      let n = 0;
+      for (let i = 0; i < node.children.length; i++, n++) {
+        const currentNode = Node.get(editor, path);
+        const prev = currentNode.children[n - 1] as Descendant;
         const child = node.children[i];
-        if (Text.isText(child)) {
-          if (Text.isText(prev) && Text.equals(child, prev, { isEqualText: false })) {
-            // 前后相同可以合并
+        /**
+         * 规则2: 合并空的或匹配的相邻文本节点。
+         */
+        if (Text.isText(child) && Text.isText(prev)) {
+          /**
+           * 规则2.1: 相邻且完全相同的 properties 的 Text 合并成一个节点
+           */
+          if (Text.equals(child, prev, { isEqualText: false })) {
             Transforms.mergeNodes(editor, {
-              at: path.concat(i),
+              at: path.concat(n),
               position: prev.text.length,
             });
-          } else if (child.text === '') {
-            // 自己是空可以删除
+            n--;
+          }
+          /**
+           * 规则2.2: 后一个节点时空直接删除
+           */
+          else if (child.text === '') {
             Transforms.removeNode(editor, {
-              at: path.concat(i)
+              at: path.concat(n)
             });
+            n--;
           }
         } else if (Element.isElement(child)) {
           // TODO

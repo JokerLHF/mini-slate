@@ -1,4 +1,4 @@
-import { Point } from "./point"
+import { Point, PointEntry } from "./point"
 import { isPlainObject } from 'is-plain-object';
 import { ExtendedType } from "./custom-types";
 import { Operation } from "./operation";
@@ -23,10 +23,16 @@ export interface RangeInterface {
     range: Range,
     op: Operation,
     options?: RangeRefOptions,
-  ) => Range | null
+  ) => Range | null;
+  points: (range: Range) => Generator<PointEntry, void, undefined>
 }
 
 export const Range: RangeInterface = {
+  *points(range: Range): Generator<PointEntry, void, undefined> {
+    yield [range.anchor, 'anchor']
+    yield [range.focus, 'focus']
+  },
+
   isRange(value: any): value is Range {
     return (
       isPlainObject(value) &&

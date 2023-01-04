@@ -162,7 +162,6 @@ export const Editable = (props: EditableProps) => {
     const { inputType, data } = event;
     let isNative = false;
 
-    // const { selection } = editor;
     // TODO: 还不是很理解为什么这里对于单字符的插入要使用 浏览器接管渲染
     // if (
     //   inputType === 'insertText' &&
@@ -178,10 +177,21 @@ export const Editable = (props: EditableProps) => {
     if (!isNative) {
       event.preventDefault();
     }
-
     console.log('onBeforeInput', event);
+
+    const { selection } = editor;
+    // 多选的删除
+    if (
+      selection &&
+      !Range.isCollapsed(selection) &&
+      event.inputType.startsWith('delete')
+    ) {
+      Editor.deleteFragment(editor);
+      return;
+    }
+
     switch (inputType) {
-      case 'insertText':
+      case 'insertText': {
         if (typeof data === 'string') {
           if (isNative) {
             deferredOperations.current.push(() =>
@@ -191,6 +201,12 @@ export const Editable = (props: EditableProps) => {
             Editor.insertText(editor, data)
           }
         }
+        break;
+      }
+      case 'deleteContentBackward': {
+        Editor.deleteBackward(editor);
+        break;
+      }
       default:
         break;
     }

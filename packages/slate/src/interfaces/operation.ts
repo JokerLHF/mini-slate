@@ -24,6 +24,11 @@ export type BaseTextOperation = {
   path: Path,
   offset: number,
   text: string,
+} | {
+  type: 'remove_text',
+  path: Path,
+  offset: number,
+  text: string,
 }
 
 export type BaseNodeOperation = {
