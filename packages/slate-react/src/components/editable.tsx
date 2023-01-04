@@ -151,7 +151,7 @@ export const Editable = (props: EditableProps) => {
         scheduleOnDOMSelectionChange
       )
     }
-  });
+  }, [scheduleOnDOMSelectionChange]);
 
   const onBeforeInput = useCallback((event: InputEvent) => {
     // 中文环境交给浏览器渲染    

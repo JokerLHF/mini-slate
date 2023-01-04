@@ -6,10 +6,14 @@ import { Path } from "../interfaces/path";
 import { Point } from "../interfaces/point";
 import { Range } from "../interfaces/range";
 
+interface SetNodeOptions {
+  at?: Location
+}
+
 export interface NodeTransforms {
   insertNode: (editor: Editor, node: Node, options?: { select?: boolean; at?: Location }) => void;
   splitNodes: (editor: Editor, options: { at: Point }) => void;
-  setNode: (editor: Editor, props: Partial<Node>) => void;
+  setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => void;
   mergeNodes: (editor: Editor, options: { at: Path, position: number } ) => void;
   removeNode: (editor: Editor, options: { at: Path }) => void;
 }
@@ -31,6 +35,11 @@ export const NodeTransforms: NodeTransforms = {
     });
   },
 
+  /**
+   * 1. 对于在 point 中 insertNode，以 point 为中心将 textNode 分割为前后，随后插入节点
+   * 2. 对于在 path 中 insertNode，就直接插入
+   * 3. 对于在 range 中 insertNode，如果 range 是 collapsed 跟 point 处理同理，如果是非collaspd，将选中的 range 删除，随后插入
+   */
   insertNode: (
     editor: Editor,
     node: Node,
@@ -84,25 +93,37 @@ export const NodeTransforms: NodeTransforms = {
     });
   },
 
-  setNode: (editor: Editor, props: Partial<Node>) => {
+  /**
+   * 1. 对于在 range 中 insertNode，如果 range 是 collapsed 不处理，如果是非collaspd，将选中的 range 进行 splitNode
+   */
+  setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => {
     Editor.withoutNormalizing(editor, () => {
-      const { selection } = editor;
+      let { at = editor.selection } = options || {};
+      if (!at) {
+        return;
+      }
 
-      // 只处理光标扩展的情况
-      if (Range.isRange(selection) && !Range.isCollapsed(selection)) {
-        // 1. 先对节点进行分割
-        const rangeRef = Editor.rangeRef(editor, selection, { affinity: 'inward' });
+      if (Range.isRange(at)) {
+        if (Range.isCollapsed(at)) {
+          return;
+        }
+        // 1. 光标扩展先对节点进行分割
+        const rangeRef = Editor.rangeRef(editor, at, { affinity: 'inward' });
         /**
-         * 从后到前分割好处：end 拆分为多个 node 对于 start 的 path 无影响
-         * 从前到后：start 拆分为多个 node 对于 end 的 path 会有影响
-         */
-        const [start, end] = Range.edges(selection);
+        * 从后到前分割好处：end 拆分为多个 node 对于 start 的 path 无影响
+        * 从前到后：start 拆分为多个 node 对于 end 的 path 会有影响
+        */
+        const [start, end] = Range.edges(at);
         Transforms.splitNodes(editor, { at: end });
         Transforms.splitNodes(editor, { at: start });
-        const at = rangeRef.unref();
+        at = rangeRef.unref()!;
 
         // 2. 对选区的节点增加 mark
-        for (const [textNode, textNodePath] of Node.texts(editor, { from: at?.anchor.path, to: at?.focus.path })) {
+        for (const [textNode, textNodePath] of Node.texts(editor, { 
+          from: at.anchor.path, 
+          to: at.focus.path,
+          reverse: Range.isBackward(at),
+        })) {
           let hasChanges = false;
           for (const k in props) {
             if (k === 'children' || k === 'text') {

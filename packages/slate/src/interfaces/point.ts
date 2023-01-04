@@ -98,9 +98,15 @@ export const Point: PointInterface = {
         case 'split_node': {
           // 自身的 op 需要改变 offset
           if (Path.equals(op.path, path)) {
-            // point 需要向前的需要修改 offset 和 path
-            // point 不需要向前的，不处理
-            if (op.position === p.offset && affinity === 'forward') {
+            /**
+             * 12|3|4
+             * 假设选区选择了3，首先会对 focus 的光标的点进行拆分
+             * 随后会对 anchor 的光标的点进行拆分，此时的 focus 的光标的位置也需要改变
+             */
+            if (
+              op.position < p.offset || 
+              (op.position === p.offset && affinity === 'forward')
+            ) {
               p.offset -= op.position;
               p.path = Path.transform(path, op, { affinity: 'forward' })!;
             }

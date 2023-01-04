@@ -27,8 +27,8 @@ export const createEditor = (): Editor => {
       }
 
       if (marks) {
-        const node = { text, ...marks }
-        Transforms.insertNode(editor, node)
+        const node = { text, ...marks };
+        Transforms.insertNode(editor, node);
       } else {
         Transforms.insertText(editor, text);
       }

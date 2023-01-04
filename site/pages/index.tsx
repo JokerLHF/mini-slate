@@ -54,13 +54,14 @@ const HomePage = () => {
   const editor = useMemo(() => withReact(createEditor()), [])
   const renderLeaf = useCallback(props => <Leaf {...props} />, [])
 
-  const handleMark = useCallback(() => {
+  const handleMark = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
     Editor.addMark(editor, 'bold', true);
   }, [editor]);
 
   return (
     <Slate editor={editor} value={initialValue}>
-      <div onClick={handleMark}>点我加粗</div>
+      <div onMouseDown={handleMark}>点我加粗</div>
       <Editable
         renderLeaf={renderLeaf}
       />
