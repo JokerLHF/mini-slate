@@ -20,7 +20,7 @@ export const SelectionTransforms: SelectionTransforms = {
     const targetRange = Editor.range(editor, target);
     // 存在 selection 直接设置
     if (selection) {
-      Transforms.setSelection(editor, targetRange)
+      Transforms.setSelection(editor, targetRange);
       return;
     }
 
@@ -58,7 +58,7 @@ export const SelectionTransforms: SelectionTransforms = {
 
     for (const key in props) {
       // 记录不相等的
-      if (key !== null && !Point.equals(selection[key], props[key])) {
+      if (props[key] !== null && !Point.equals(selection[key], props[key])) {
         oldProps[key] = selection[key];
         newProps[key] = props[key];
       }

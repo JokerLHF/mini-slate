@@ -30,7 +30,6 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
           throw new Error('Cannot apply an incomplete "set_selection" operation properties');
         }
         selection = { ...newProperties };
-        break;
       }
   
       for (const key in newProperties) {
@@ -119,15 +118,23 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
     }
 
     case 'set_node': {
-      const { path, newProperties } = op;
+      const { path, newProperties, properties } = op;
       const node = Node.get(editor, path);
 
+      // 设置新的属性
       for (const key in newProperties) {
         const value = newProperties[key]
         if (value === null) {
           delete node[key];
         } else {
           node[key] = value;
+        }
+      }
+
+      // 遍历旧属性，新属性中不存在就删除
+      for (const key in properties) {
+        if (!newProperties[key]) {
+          delete node[key];
         }
       }
       break;

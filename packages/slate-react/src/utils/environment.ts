@@ -4,4 +4,6 @@ export const CAN_USE_DOM = !!(
   typeof window !== 'undefined' &&
   typeof window.document !== 'undefined' &&
   typeof window.document.createElement !== 'undefined'
-)
+);
+
+export const IS_APPLE = typeof navigator !== 'undefined' && /Mac OS X/.test(navigator.userAgent);

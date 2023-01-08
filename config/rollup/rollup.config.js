@@ -1,5 +1,7 @@
 import SlateCore from '../../packages/slate/package.json'
 import SlateReact from '../../packages/slate-react/package.json'
+import SlateHistory from '../../packages/slate-history/package.json'
+
 import babel from 'rollup-plugin-babel'
 import commonjs from 'rollup-plugin-commonjs'
 import json from 'rollup-plugin-json'
@@ -115,7 +117,6 @@ function configure(pkg, env, target) {
   }
 }
 
-
 function factory(pkg, options = {}) {
   return configure(pkg, 'development', 'module', options);
 }
@@ -123,4 +124,5 @@ function factory(pkg, options = {}) {
 export default [
   factory(SlateReact),
   factory(SlateCore),
+  factory(SlateHistory),
 ]

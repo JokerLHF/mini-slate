@@ -59,6 +59,7 @@ export const TextTransforms: TextTransforms = {
         at = at.anchor
       }
 
+      // 如果是 point 处理成 range，下面都是统一成 range 的逻辑去处理
       if (Point.isPoint(at)) {
         const target = Editor.before(editor, at)!;
         at = { anchor: at, focus: target };

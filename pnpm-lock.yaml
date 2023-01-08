@@ -71,21 +71,31 @@ importers:
       is-plain-object: 5.0.0
       lodash: 4.17.21
 
+  packages/slate-history:
+    specifiers:
+      slate: workspace:^1.0.0
+    dependencies:
+      slate: link:../slate
+
   packages/slate-react:
     specifiers:
+      '@types/is-hotkey': ^0.1.7
       '@types/lodash': ^4.14.186
       '@types/react': ^18.0.21
       '@types/react-dom': ^18.0.6
+      is-hotkey: ^0.2.0
       lodash: ^4.17.21
       react: ^18.2.0
       react-dom: ^18.2.0
       slate: workspace:^1.0.0
     dependencies:
+      is-hotkey: 0.2.0
       lodash: 4.17.21
       react: 18.2.0
       react-dom: 18.2.0_react@18.2.0
       slate: link:../slate
     devDependencies:
+      '@types/is-hotkey': 0.1.7
       '@types/lodash': 4.14.186
       '@types/react': 18.0.21
       '@types/react-dom': 18.0.6
@@ -95,9 +105,11 @@ importers:
       '@types/node': 18.11.17
       '@types/react': ^18.0.21
       slate: workspace:^1.0.0
+      slate-history: workspace:^1.0.0
       slate-react: workspace:^1.0.0
     dependencies:
       slate: link:../packages/slate
+      slate-history: link:../packages/slate-history
       slate-react: link:../packages/slate-react
     devDependencies:
       '@types/node': 18.11.17
@@ -1872,6 +1884,10 @@ packages:
       '@types/node': 18.11.0
     dev: true
 
+  /@types/is-hotkey/0.1.7:
+    resolution: {integrity: sha512-yB5C7zcOM7idwYZZ1wKQ3pTfjA9BbvFqRWvKB46GFddxnJtHwi/b9y84ykQtxQPg5qhdpg4Q/kWU3EGoCTmLzQ==}
+    dev: true
+
   /@types/istanbul-lib-coverage/2.0.4:
     resolution: {integrity: sha512-z/QT1XN4K4KYuslS23k62yDIDLwLFkzxOuMplDtObz0+y7VqJCaO2o+SPwHCvLFZh7xazvvoor2tA/hPz9ee7g==}
     dev: true
@@ -3109,6 +3125,10 @@ packages:
     engines: {node: '>=0.10.0'}
     dependencies:
       is-extglob: 2.1.1
+    dev: false
+
+  /is-hotkey/0.2.0:
+    resolution: {integrity: sha512-UknnZK4RakDmTgz4PI1wIph5yxSs/mvChWs9ifnlXsKuXgWmOkY/hAE0H/k2MIqH0RlRye0i1oC07MCRSD28Mw==}
     dev: false
 
   /is-module/1.0.0:

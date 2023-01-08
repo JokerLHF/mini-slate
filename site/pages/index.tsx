@@ -1,13 +1,14 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import { Editable, withReact, Slate, RenderElementProps, RenderLeafProps } from 'slate-react';
 import { createEditor, Element, Editor, Descendant, Text } from 'slate';
+import { withHistory } from 'slate-history';
 
 const initialValue: Descendant[] = [
   {
     children: [
-      {text: '111'},
-      {text: '222'},
-      {text: '333'},
+      {text: '111222333'},
+      // {text: '222'},
+      // {text: '333'},
     ]
   },
 ]
@@ -51,13 +52,17 @@ const Leaf = (props: RenderLeafProps) => {
 
 
 const HomePage = () => {
-  const editor = useMemo(() => withReact(createEditor()), [])
+  const editor = useMemo(() => withHistory(withReact(createEditor())), []);
   const renderLeaf = useCallback(props => <Leaf {...props} />, [])
 
   const handleMark = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     Editor.addMark(editor, 'bold', true);
   }, [editor]);
+
+  // useEffect(() => {
+  //   Editor.normalize(editor);
+  // }, []);
 
   return (
     <Slate editor={editor} value={initialValue}>

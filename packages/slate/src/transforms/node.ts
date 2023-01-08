@@ -118,6 +118,10 @@ export const NodeTransforms: NodeTransforms = {
         Transforms.splitNodes(editor, { at: start });
         at = rangeRef.unref()!;
 
+        if (!options?.at) {
+          Transforms.select(editor, at);
+        }
+
         // 2. 对选区的节点增加 mark
         for (const [textNode, textNodePath] of Node.texts(editor, { 
           from: at.anchor.path, 
@@ -125,21 +129,34 @@ export const NodeTransforms: NodeTransforms = {
           reverse: Range.isBackward(at),
         })) {
           let hasChanges = false;
+
+          const oldProperties = {};
+          for (const o in textNode) {
+            if (o === 'children' || o === 'text') {
+              continue
+            }
+            oldProperties[o] = textNode[o];
+          }
+
           for (const k in props) {
             if (k === 'children' || k === 'text') {
               continue
             }
   
-            if (props[k] !== textNode[k]) {
+            if (props[k] !== oldProperties[k]) {
               hasChanges = true;
               break;
             }
           }
   
+          /**
+         * TODO: 思考如果这里只存差异点是不是好一点？这种全量方式在协同冲突是不是无解了？
+         */
           if (hasChanges) {
             editor.apply({
               type: 'set_node',
               newProperties: props,
+              properties: oldProperties,
               path: textNodePath,
             })
           }
@@ -162,7 +179,8 @@ export const NodeTransforms: NodeTransforms = {
     Editor.withoutNormalizing(editor, () => {
       editor.apply({
         type: 'remove_node',
-        path: options.at
+        path: options.at,
+        node: Node.get(editor, options.at),
       });
     });
   }

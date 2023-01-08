@@ -7,6 +7,7 @@ import { ReactEditor } from '../plugin/react-editor';
 import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING } from '../utils/weak-map';
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
+import HOT_KEYS from '../utils/hotkeys';
 
 export interface RenderElementProps {
   children: any
@@ -97,6 +98,14 @@ export const Editable = (props: EditableProps) => {
     const domSelection = root.getSelection();
     if (!domSelection) {
       return;
+    }
+
+    if (selection && !ReactEditor.hasRange(editor, selection)) {
+      editor.selection = ReactEditor.toSlateRange(editor, domSelection, {
+        exactMatch: false,
+        suppressThrow: true,
+      })        
+      return
     }
 
     // 根据 editoe.selection 设置 domSelection
@@ -253,6 +262,19 @@ export const Editable = (props: EditableProps) => {
         IS_COMPOSING.set(editor, false);
         Editor.insertText(editor, event.data);
       }, [editor])}
+      onKeyDown={useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        const { nativeEvent } = event;
+        if (HOT_KEYS.isRedo(nativeEvent)) {
+          console.log('HOT_KEYS-isRedo');
+          (editor as any).redo && (editor as any).redo();
+          return;
+        }
+        if (HOT_KEYS.isUndo(nativeEvent)) {
+          console.log('HOT_KEYS-isUndo');
+          (editor as any).undo && (editor as any).undo();
+          return;
+        }
+      }, [])}
     >
       <Children
         node={editor} 

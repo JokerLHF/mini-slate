@@ -309,5 +309,12 @@ export const ReactEditor = {
 
   isComposing(editor: ReactEditor): boolean {
     return !!IS_COMPOSING.get(editor);
-  }
+  },
+
+  hasRange(editor: ReactEditor, range: Range): boolean {
+    const { anchor, focus } = range
+    return (
+      Editor.hasPath(editor, anchor.path) && Editor.hasPath(editor, focus.path)
+    )
+  },
 }
