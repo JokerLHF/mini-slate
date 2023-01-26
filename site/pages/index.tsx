@@ -6,9 +6,12 @@ import { withHistory } from 'slate-history';
 const initialValue: Descendant[] = [
   {
     children: [
-      {text: '111222333'},
-      // {text: '222'},
-      // {text: '333'},
+      { children: [{text: '111'}] },
+      { children: [{text: '222'}] },
+      { children: [{text: '333'}] },
+      { children: [{text: '444'}] },
+      { children: [{text: '555'}] },
+      { children: [{text: '666'}] },
     ]
   },
 ]

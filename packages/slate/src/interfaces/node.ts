@@ -2,6 +2,8 @@ import { Editor } from './editor';
 import { Element } from './element';
 import { Path } from './path';
 import { Text } from './text';
+import { Range } from './range';
+import produce from 'immer';
 
 export type Descendant = Element | Text;
 export type Node = Editor | Element | Text;
@@ -9,15 +11,16 @@ export type Ancestor = Editor | Element;
 export type NodeEntry<T extends Node = Node> = [T, Path];
 
 export interface NodeNodesOptions {
-  from?: Path,
-  to?: Path,
-  reverse?: boolean,
+  from?: Path;
+  to?: Path;
+  reverse?: boolean;
+  pass?: (node: NodeEntry) => boolean;
 }
 
 export interface NodeTextsOptions {
-  from?: Path,
-  to?: Path,
-  reverse?: boolean,
+  from?: Path;
+  to?: Path;
+  reverse?: boolean;
 }
 
 /**
@@ -26,7 +29,7 @@ export interface NodeTextsOptions {
 
 export interface NodeInterface {
   isNodeList: (value: any) => boolean;
-  isNode: (value: any) => boolean;
+  isNode: (value: any) => value is Node;
   get: (root: Node, path: Path) => Node;
   parent: (root: Node, path: Path) => Ancestor;
   first: (root: Node, path: Path) => NodeEntry;
@@ -36,6 +39,7 @@ export interface NodeInterface {
   nodes: (root: Node, options?: NodeNodesOptions) => Generator<NodeEntry, void, undefined>;
   string: (node: Node) => string;
   levels: (root: Node, path: Path) => Generator<NodeEntry, void, undefined>;
+  fragment: (root: Node, range: Range) => Descendant[];
 }
 
 export const Node: NodeInterface = {
@@ -47,7 +51,8 @@ export const Node: NodeInterface = {
     const isNodeList = value.every(val => Node.isNode(val))
     return isNodeList
   },
-  isNode(value: any) {
+
+  isNode(value: any): value is Node {
     return (
       Text.isText(value) || Element.isElement(value) || Editor.isEditor(value)
     )
@@ -147,9 +152,10 @@ export const Node: NodeInterface = {
    */
   *nodes(
     root: Node,
-    options: NodeNodesOptions = {}
+    options: NodeNodesOptions = {},
   ): Generator<NodeEntry, void, undefined> {
-    const { from = [], to, reverse = false } = options;
+    // pass=true 表示忽略遍历子节点
+    const { from = [], to, reverse = false, pass } = options;
     let n = root;
     let p: Path = [];
     const visited = new Set();
@@ -165,7 +171,12 @@ export const Node: NodeInterface = {
       }
 
       // 1. 向下遍历子节点
-      if (!visited.has(n) && !Text.isText(n) && !!n.children.length) {
+      if (
+        !visited.has(n) &&
+        !Text.isText(n) &&
+        !!n.children.length &&
+        (pass ? pass([n, p]) === false : true)
+      ) {
         visited.add(n);
 
         let newIndex = reverse ? n.children.length - 1 : 0;
@@ -216,5 +227,35 @@ export const Node: NodeInterface = {
       const n = Node.get(root, p);
       yield [n, p]
     }
+  },
+
+  fragment(root: Node, range: Range): Descendant[] {    
+    const newRoot = produce({ children: root.children }, r => {
+      const [start, end] = Range.edges(range);
+      const nodeEntries = Node.nodes(r, {
+        reverse: true, // 这里使用 reverse 从后往前输出节点，使得即使后面的节点被删了，也不会影响前面节点的 path
+        pass: ([, path]) => !Range.includes(range, path),
+      })
+      for (const nodeEntry of nodeEntries) {
+        let [_, path] = nodeEntry;
+        if (!Range.includes(range, path)) {
+          const parent = Node.parent(r, path)
+          const index = path[path.length - 1]
+          parent.children.splice(index, 1)
+        }
+  
+        if (Path.equals(path, end.path)) {
+          const leaf = Node.get(r, path);
+          leaf.text = leaf.text.slice(0, end.offset);
+        }
+
+        if (Path.equals(path, start.path)) {
+          const leaf = Node.get(r, path);
+          leaf.text = leaf.text.slice(start.offset);
+        }
+      }
+    });
+    
+    return newRoot.children;
   }
 }

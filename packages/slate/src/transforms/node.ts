@@ -1,37 +1,73 @@
 import { Transforms } from ".";
-import { Editor } from "../interfaces/editor";
+import { Editor, NodeMatch } from "../interfaces/editor";
+import { Element } from "../interfaces/element";
 import { Location } from "../interfaces/location";
 import { Node } from '../interfaces/node';
 import { Path } from "../interfaces/path";
 import { Point } from "../interfaces/point";
 import { Range } from "../interfaces/range";
+import { Text } from "../interfaces/text";
+import { SelectionMode } from '../interfaces/types';
 
 interface SetNodeOptions {
-  at?: Location
+  at?: Location;
+}
+
+interface SplitNodeOptions<T extends Node> {
+  at: Point;
+  always?: boolean;
+  match?: NodeMatch<T>,
+  mode?: SelectionMode,
 }
 
 export interface NodeTransforms {
-  insertNode: (editor: Editor, node: Node, options?: { select?: boolean; at?: Location }) => void;
-  splitNodes: (editor: Editor, options: { at: Point }) => void;
+  insertNodes: (editor: Editor, nodes: Node | Node[], options?: { select?: boolean; at?: Location }) => void;
+  splitNodes: <T extends Node>(editor: Editor, options: SplitNodeOptions<T>) => void;
   setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => void;
   mergeNodes: (editor: Editor, options: { at: Path, position: number } ) => void;
   removeNode: (editor: Editor, options: { at: Path }) => void;
 }
 
-// eslint-disable-next-line no-redeclare
 export const NodeTransforms: NodeTransforms = {
-  splitNodes: (editor: Editor, options: { at: Point }) => {
+  splitNodes: <T extends Node>(editor: Editor, options: SplitNodeOptions<T>) => {
     Editor.withoutNormalizing(editor, () => {
-      const { at } = options;
-      // 处于节点最左边或者最右边不处理
-      if (Editor.isEdge(editor, at, at.path)) {
+      const { 
+        at,
+        always = false,
+        match = n => Element.isElement(n),
+        mode = 'lowest'
+      } = options;
+
+      const [highest] = Editor.nodes(editor, { at, match, mode });
+      const [_, highestPath] = highest || [];
+      if (!highestPath) {
         return;
       }
-      editor.apply({
-        type: 'split_node',
-        position: at.offset,
-        path: at.path,
-      });
+
+      const lowestPath = at.path;
+      let position = at.offset;
+
+      for (const [_, path] of Editor.levels(editor, { 
+        at: lowestPath,
+        reverse: true,
+      })) {
+        let split = false;
+        if (path.length < highestPath.length || !path.length) {
+          break
+        }
+        // 处于节点最左边或者最右边不处理
+        if (always || !Editor.isEdge(editor, at, path)) {
+          split = true;
+          editor.apply({
+            type: 'split_node',
+            position,
+            path,
+          });
+        }
+        // 第一次 position 是用来 split SlateTextNode 的，
+        // 后续的 position 是用来 split Slate ElementNode 的
+        position = path[path.length - 1] + (split ? 1 : 0)
+      }
     });
   },
 
@@ -40,13 +76,20 @@ export const NodeTransforms: NodeTransforms = {
    * 2. 对于在 path 中 insertNode，就直接插入
    * 3. 对于在 range 中 insertNode，如果 range 是 collapsed 跟 point 处理同理，如果是非collaspd，将选中的 range 删除，随后插入
    */
-  insertNode: (
+  insertNodes: (
     editor: Editor,
-    node: Node,
+    nodes: Node | Node[],
     options?: { select?: boolean; at?: Location }
   ) => {
     Editor.withoutNormalizing(editor, () => {
-      let { select = true, at = editor.selection} = options || {}
+      let { select = true, at = editor.selection} = options || {};
+      if (Node.isNode(nodes)) {
+        nodes = [nodes]
+      }
+
+      if (!nodes.length) {
+        return;
+      }
       /**
        * 1. 将 at 处理成 path
        */
@@ -66,7 +109,7 @@ export const NodeTransforms: NodeTransforms = {
         
         // 1. 先将 node 按照 at 位置分割
         const pathRef = Editor.pathRef(editor, at.path);
-        Transforms.splitNodes(editor, { at });
+        Transforms.splitNodes(editor, { at, match: Text.isText });
         const path = pathRef.unref()!;
              
         // 如果是在节点的边缘插入插入新节点，因为在边缘节点不会去 splitNode，所以此时的 path 的值不会改变，所以需要手动指向 next
@@ -79,13 +122,22 @@ export const NodeTransforms: NodeTransforms = {
       if (!at) {
         return;
       }
-      editor.apply({
-        type: 'insert_node',
-        node,
-        path: at,
-      });
+      const parentPath = Path.parent(at);
+      let index = at[at.length - 1];
+      for (const node of nodes) {
+        const path = parentPath.concat(index);
+        editor.apply({
+          type: 'insert_node',
+          node,
+          path,
+        });
+        index++;
+        // 插入之后指向下一个
+        at = Path.next(at);
+      }
 
       // 3. 光标选中到插入的节点
+      at = Path.previous(at);
       if (select) {
         const point = Editor.point(editor, at, { edge: 'end' });
         Transforms.select(editor, point);
@@ -114,8 +166,8 @@ export const NodeTransforms: NodeTransforms = {
         * 从前到后：start 拆分为多个 node 对于 end 的 path 会有影响
         */
         const [start, end] = Range.edges(at);
-        Transforms.splitNodes(editor, { at: end });
-        Transforms.splitNodes(editor, { at: start });
+        Transforms.splitNodes(editor, { at: end, match: Text.isText });
+        Transforms.splitNodes(editor, { at: start, match: Text.isText });
         at = rangeRef.unref()!;
 
         if (!options?.at) {

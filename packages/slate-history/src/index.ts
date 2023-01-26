@@ -2,7 +2,7 @@ import { Editor, Operation, Path } from 'slate';
 import { HistoryEditor } from './history-editor';
 
 
-export const withHistory = <T extends Editor>(editor: T): HistoryEditor => {
+export const withHistory = <T extends Editor>(editor: T) => {
   const e = editor as T & HistoryEditor;
 
   const { apply } = e;

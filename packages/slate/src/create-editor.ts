@@ -28,7 +28,7 @@ export const createEditor = (): Editor => {
 
       if (marks) {
         const node = { text, ...marks };
-        Transforms.insertNode(editor, node);
+        Transforms.insertNodes(editor, node);
       } else {
         Transforms.insertText(editor, text);
       }
@@ -65,15 +65,15 @@ export const createEditor = (): Editor => {
     },
 
     apply: (op: Operation) => {
-      for (const pointRef of Editor.pointRefs(editor)) {        
+      for (const pointRef of Editor.pointRefs(editor)) {
         PointRef.transform(pointRef, op);
       }
 
-      for (const rangeRef of Editor.rangeRefs(editor)) {        
+      for (const rangeRef of Editor.rangeRefs(editor)) {
         RangeRef.transform(rangeRef, op);
       }
 
-      for (const pathRef of Editor.pathRefs(editor)) {        
+      for (const pathRef of Editor.pathRefs(editor)) {
         PathRef.transform(pathRef, op);
       }
 
@@ -178,7 +178,7 @@ export const createEditor = (): Editor => {
        */
       if (Element.isElement(node) && node.children.length === 0) {
         const child = { text: '' };
-        Transforms.insertNode(editor, child, {
+        Transforms.insertNodes(editor, child, {
           at: path.concat(0),
         })
         return
@@ -221,7 +221,16 @@ export const createEditor = (): Editor => {
           // TODO
         }
       }
-    }
+    },
+
+    getFragment: () => {
+      const { selection } = editor;
+      return selection ? Node.fragment(editor, selection) : [];
+    },
+
+    insertFragment: (data: Node[]) => {
+      Transforms.insertFragment(editor, data);
+    },
   };
 
   (globalThis as any).editor = editor;

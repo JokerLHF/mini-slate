@@ -21,7 +21,7 @@ export const SlateContext = createContext<{
  * Get the current editor object from the React context.
  */
 
-export const useSlate = (): Editor => {
+export const useSlate = () => {
   const context = useContext(SlateContext)
 
   if (!context) {

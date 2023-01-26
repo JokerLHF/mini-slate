@@ -53,10 +53,25 @@ export const withReact = <T extends BaseEditor>(editor: T): T & ReactEditor=> {
       NODE_TO_KEY.set(node, key)
     }
   }
+
+  e.setFragmentData = (data: DataTransfer) => {
+    const fragment = Editor.getFragment(e);    
+    const encoded = window.btoa(encodeURIComponent(JSON.stringify(fragment)));
+    data.setData('application/x-slate-fragment', encoded);
+  };
+
+  e.insertFragmentData = (data: DataTransfer) => {
+    let slateFragment = data.getData('application/x-slate-fragment');
+    if (slateFragment) {
+      const slateElemnt = JSON.parse(decodeURIComponent(window.atob(slateFragment)));
+      Editor.insertFragment(e, slateElemnt);
+    }
+  };
+
   return e;
 }
 
-const getMatches = (e: Editor, path: Path) => {
+const getMatches = (e: ReactEditor, path: Path) => {
   const matches: [Path, Key][] = []
   for (const [n, p] of Editor.levels(e, { at: path })) {
     const key = ReactEditor.findKey(e, n)

@@ -14,6 +14,7 @@ import { PointRef } from "./point-ref";
 import { DIRTY_PATHS, DIRTY_PATHS_KEYS, NORMALIZING, PATH_REFS, POINT_REFS, RANGE_REFS } from "../utils/weak-maps";
 import { RangeRef } from "./range-ref";
 import { PathRef } from "./path-ref";
+import { SelectionMode } from './types';
 
 export type BaseSelection = Range | null;
 export type Selection = ExtendedType<BaseSelection>;
@@ -30,6 +31,13 @@ export interface EditorNodeOptions {
   edge?: LeafEdge
 }
 
+export interface EditorNodesOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  reverse?: boolean;
+  mode?: SelectionMode,
+}
+
 export interface EditorPositionsOptions {
   at?: Location,
   reverse?: boolean,
@@ -40,10 +48,14 @@ export type NodeMatch<T extends Node> =
   | ((node: Node, path: Path) => boolean)
 
 export interface EditorLevelsOptions<T extends Node> {
-  at?: Location
-  match?: NodeMatch<T>
-  reverse?: boolean
-  voids?: boolean
+  at?: Location;
+  match?: NodeMatch<T>;
+  reverse?: boolean;
+}
+export interface EditorAboveOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  reverse?: boolean;
 }
 
 export interface PointRefOptions {
@@ -81,6 +93,9 @@ export interface BaseEditor {
   apply: (operation: Operation) => void;
   getDirtyPaths: (op: Operation) => Path[];
   normalizeNode: (entry: NodeEntry) => void;
+
+  getFragment: () => Descendant[];
+  insertFragment: (data: Node[]) => void;
 }
 
 export type Editor = ExtendedType<BaseEditor>;
@@ -92,6 +107,11 @@ export interface EditorInterface {
   point: (editor: Editor, at: Location, options?: EditorPointOptions) => Point;
   hasPath: (editor: Editor, path: Path) => boolean;
   node: (editor: Editor, at: Location, options?: EditorNodeOptions) => NodeEntry;
+  nodes: <T extends Node>(
+    editor: Editor,
+    options?: EditorNodesOptions<T>
+  ) => Generator<NodeEntry, void, undefined>;
+
   before: (editor: Editor,at: Location) => Point | undefined;
   positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>;
   addMark: (editor: Editor, key: string, value: any) => void;
@@ -99,7 +119,13 @@ export interface EditorInterface {
   insertText: (editor: Editor, text: string) => void;
   deleteBackward: (editor: Editor) => void;
   deleteFragment: (editor: Editor) => void;
+  getFragment: (editor: Editor) => Descendant[];
+  insertFragment: (editor: Editor, data: Descendant[]) => void;
 
+  above: <T extends Node> (
+    editor: Editor, 
+    options?: EditorAboveOptions<T>
+  ) =>  NodeEntry<T> | undefined;
   levels: <T extends Node>(
     editor: Editor,
     options?: EditorLevelsOptions<T>
@@ -151,6 +177,8 @@ export const Editor: EditorInterface = {
       && typeof value.insertText === 'function'
       && typeof value.getDirtyPaths === 'function'
       && typeof value.normalizeNode === 'function'
+      && typeof value.getFragment === 'function'
+      && typeof value.insertFragment === 'function'
       && (value.selection === null || Range.isRange(value.selection));
     return isEditor
   },
@@ -278,6 +306,65 @@ export const Editor: EditorInterface = {
     return [node, path]
   },
 
+  *nodes<T extends Node>(
+    editor: Editor,
+    options: EditorNodesOptions<T> = {}
+  ) {
+    const {
+      at = editor.selection,
+      match = () => true,
+      reverse = false,
+      mode = 'all',
+    } = options;
+
+    if (!at) {
+      return;
+    }
+    // 1. 计算 from to
+    const first = Editor.path(editor, at, { edge: 'start' });
+    const last = Editor.path(editor, at, { edge: 'end' });
+    const from = reverse ? last : first;
+    const to = reverse ? first : last;
+
+    const nodeEntrys = Node.nodes(editor, {
+      from,
+      to,
+      reverse
+    });
+
+    let lastNodeEntry: NodeEntry | undefined;
+
+    for (const [node, path] of nodeEntrys) {
+      const isLower = lastNodeEntry && Path.compare(path, lastNodeEntry[1]) === 0;
+      // highest 模式下，一条路径只返回最高的，其他的都抛弃。等待变量到另外一条路径
+      if (mode === 'highest' && isLower) {
+        continue;
+      }
+
+      if (!match(node, path)) {
+        continue;
+      }
+
+      // lowest 模式下找到更低的匹配 
+      if (mode === 'lowest' && isLower) {
+        lastNodeEntry = [node, path]
+        continue;
+      }
+      // lowest 模式找到遇到不是更低的匹配就证明上一条路径已经匹配忘了，找到最低的了，返回上一次的
+      const emit: NodeEntry | undefined = mode === 'lowest' ? lastNodeEntry : [node, path];
+      if (emit) {
+        yield emit;
+      }
+
+      lastNodeEntry = [node, path];
+    }
+
+    // lowest 模式总是在新的路径返回上一次路径的结果，最后一次需要重新返回
+    if (mode === 'lowest' && lastNodeEntry) {
+      yield lastNodeEntry;
+    }
+  },
+
   /**
    * 在 at 范围之内，返回所有的 point 节点
    */
@@ -356,7 +443,6 @@ export const Editor: EditorInterface = {
     return  target;
   },
 
-
   insertText(editor: Editor, text: string) {
     editor.insertText(text);
   },
@@ -369,11 +455,40 @@ export const Editor: EditorInterface = {
     editor.deleteFragment();
   },
 
+  getFragment(editor: Editor): Descendant[] {
+    return editor.getFragment();
+  },
+
+  insertFragment(editor: Editor, data: Node[]) {
+    editor.insertFragment(data);
+  },
+
+  /**
+   * 向上找到第一个 match 的节点（除了本身）
+   */
+  above<T extends Node>(
+    editor: Editor,
+    options: EditorLevelsOptions<T> = {}
+  ): NodeEntry<T> | undefined {
+    let { at = editor.selection } = options;
+    if (!at) {
+      return;
+    }
+
+    const path = Editor.path(editor, at);
+    for (const nodeEntry of Editor.levels(editor, options)) {
+      const [n, p] = nodeEntry;
+      if (!Text.isText(n) && !Path.equals(p, path)) {
+        return nodeEntry;
+      }
+    }
+  },
+
   *levels<T extends Node>(
     editor: Editor,
     options: EditorLevelsOptions<T> = {}
   ): Generator<NodeEntry<T>, void, undefined> {
-    let { at = editor.selection, match } = options;
+    let { at = editor.selection, match, reverse } = options;
     if (!at) {
       return;
     }
@@ -391,6 +506,10 @@ export const Editor: EditorInterface = {
         continue;
       }
       levels.push([n, p]);
+    }
+
+    if (reverse) {
+      levels.reverse()
     }
 
     // 这个是什么语法 跟 yied levels 有什么不同？？

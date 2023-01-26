@@ -4,6 +4,7 @@ import { ExtendedType } from "./custom-types";
 import { Operation } from "./operation";
 import { RangeRefOptions } from "./editor";
 import produce from "immer";
+import { Path } from "./path";
 
 export interface BaseRange {
   anchor: Point
@@ -24,7 +25,8 @@ export interface RangeInterface {
     op: Operation,
     options?: RangeRefOptions,
   ) => Range | null;
-  points: (range: Range) => Generator<PointEntry, void, undefined>
+  points: (range: Range) => Generator<PointEntry, void, undefined>;
+  includes: (range: Range, target: Path) => boolean;
 }
 
 export const Range: RangeInterface = {
@@ -119,6 +121,14 @@ export const Range: RangeInterface = {
       r.anchor = anchor
       r.focus = focus
     })
+  },
+
+  includes(range: Range, target: Path): boolean {
+    const [start, end] = Range.edges(range);
+    const targetIsAfterStart = Path.compare(target, start.path) >= 0;
+    const targetIsBeforeEnd = Path.compare(target, end.path) <= 0;
+
+    return targetIsAfterStart && targetIsBeforeEnd
   },
 
 }

@@ -192,43 +192,33 @@ export const Path: PathInterface = {
       }
       switch (op.type) {
         case 'insert_node': {
-          if (Path.equals(op.path, p) || Path.endsBefore(op.path, p)) {
-            // 指向下一个
-            p[p.length - 1] += 1;
-          }
-          break;
-        }
-        case 'remove_node': {
-          // op本身或者是
-          if (Path.equals(op.path, p) || Path.isAncestor(op.path, p)) {
-            return null;
-          }
-          // op 在 path 前面，删除掉 op 之后，path 要对应减1
-          if (Path.endsBefore(op.path, p)) {
-            p[p.length - 1] -= 1;
-          }
-          break;
-        }
-        case 'split_node': {
-          const { path } = op;
-          // 自身的修改
-          if (Path.equals(path, p)) {
-            if (affinity === 'forward') {
-              p[p.length - 1] += 1
-            } else if (affinity === 'backward') {
-              // Nothing, because it still refers to the right path.
-            } else {
-              return null
-            }
-          } else if (Path.endsBefore(path, p)) {
-            // 在 p 之前的 node 节点进行了 spalitNode（1分为2），p需要+1 
-            p[path.length - 1] += 1
-          }
-          break;
-        }
-        case 'merge_node': {
-          if (Path.equals(op.path, p) || Path.endsBefore(op.path, p)) {
-            p[p.length - 1] -= 1;
+          if (
+            Path.equals(op.path, p) ||
+            Path.endsBefore(op.path, p) ||
+            Path.isAncestor(op.path, p)
+          ) {
+           /**
+            * 指向下一个
+            * [0,0]
+            *   [0,0,0]
+            * [0,1]
+            *   [0,1,0]
+            * [0,2]
+            *   [0,2,0]
+            * 
+            * endBefores场景：
+            *   如果此时 path 是[0,2,0], 在[0,1] 中插入一个 node，
+            *   对于[0,2,0]来说，需要在  op.path.length - 1 处 +1, 变成 [0,3,0]
+            * 
+            *   如果此时 path 是[0,2], 在[0,1] 中插入一个 node，
+            *   对于[0,2]来说，需要在  op.path.length - 1 处 +1, 变成 [0,3]
+            * 
+            * isAncestor场景：
+            *    如果此时 path 是[0,2,0], 在[0,2] 中插入一个 node，
+            *    对于[0,2,0]来说，需要在  op.path.length - 1 处 +1, 变成 [0,3,0]
+            * 
+            */
+            p[op.path.length - 1] += 1;
           }
           break;
         }
@@ -239,8 +229,77 @@ export const Path: PathInterface = {
           if (Path.equals(op.path, p) || Path.isAncestor(op.path, p)) {
             return null
           } else if (Path.endsBefore(op.path, p)) {
-           // 如果删除的 op.path 在 p 左边，那么对于 p 需要 -1
-            p[p.length - 1] -= 1;
+           /**
+            * 如果删除的 op.path 在 p 左边，那么对于 p 需要 -1
+            * [0,0]
+            * [0,1]
+            * [0,2]
+            *   [0,2,1]
+            * 删掉[0,1] 对于[0,2,1]来说就需要在 op.path.length - 1 处 -1
+            */
+            p[op.path.length - 1] -= 1;
+          }
+          break;
+        }
+        case 'split_node': {
+          // 自身的修改
+          if (Path.equals(op.path, p)) {
+            if (affinity === 'forward') {
+              p[p.length - 1] += 1
+            } else if (affinity === 'backward') {
+              // Nothing, because it still refers to the right path.
+            } else {
+              return null
+            }
+          } else if (Path.endsBefore(op.path, p)) {
+            /**
+            * [0,0]
+            * [0,1]
+            * [0,2]
+            *   [0,2,1]
+            * 
+            * 对 [0,1] 节点进行了 spalitNode（1分为2）
+            * 对于[0,2,1] 来说，就需要在 op.path.length - 1 处 +1
+            */
+            p[op.path.length - 1] += 1
+          } 
+          // 这个逻辑是对于 slateElement 的分割来说的，也就是 { path: [0,0], position: 1 }，
+          // 其实是对 [0,0] 的第一个children分隔，对于 [0,0] 第二个 children，第三个 children 节点的 path 需要改变，
+          // 所以才有 p[op.path.length] >= op.position
+          else if (Path.isAncestor(op.path, p) && p[op.path.length] >= op.position) {
+            /**
+             * [0]
+             *  [0,0](AElement)
+             *     [0,0,0](BElement)
+             *     [0,0,1](CElement)
+             * 
+             * 对 [0,0] 节点进行了 spalitNode（1分为2）{ path: [0,0], position: 1 }
+             * 
+             * [0]
+             *  [0,0](AElement)
+             *     [0,0,0](BElement)
+             *  [0,1]
+             *     [0,1,0](CElement)
+             * 
+             * 对于[0,0,1]来说，
+             *  之前是按照分支的position进行分割。独立成为一个分支之后位置需要 -position 得到新的位置
+             *  独立成为新的分支，新的分支的位置是在 [0,0] 的右边，就需要在 op.path.length - 1 处 +1
+             */
+             p[op.path.length - 1] += 1;
+             p[op.path.length] -= op.position;
+          }
+          break;
+        }
+        case 'merge_node': {
+          if (Path.equals(op.path, p) || Path.endsBefore(op.path, p)) {
+            /**
+            * [0,0]
+            * [0,1]
+            * [0,2]
+            *   [0,2,1]
+            * [0,1] 合并到[0,0], 对于[0,2,1]来说就需要在 op.path.length - 1 处 -1
+            */
+            p[op.path.length - 1] -= 1;
           }
           break;
         }

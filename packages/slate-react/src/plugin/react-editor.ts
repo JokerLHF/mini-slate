@@ -4,7 +4,8 @@ import { Key } from "../utils/key";
 import { EDITOR_TO_ELEMENT, EDITOR_TO_KEY_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, NODE_TO_INDEX, NODE_TO_KEY, NODE_TO_PARENT } from "../utils/weak-map";
 
 export interface ReactEditor extends BaseEditor {
-
+  setFragmentData: (data: DataTransfer) => void;
+  insertFragmentData: (data: DataTransfer) => void;
 }
 
 // eslint-disable-next-line no-redeclare
@@ -317,4 +318,18 @@ export const ReactEditor = {
       Editor.hasPath(editor, anchor.path) && Editor.hasPath(editor, focus.path)
     )
   },
+
+  setFragmentData(
+    editor: ReactEditor,
+    data: DataTransfer
+  ) {
+    editor.setFragmentData(data)
+  },
+
+  insertFragmentData(
+    editor: ReactEditor,
+    data: DataTransfer
+  ) {
+    editor.insertFragmentData(data)
+  }
 }

@@ -2,7 +2,7 @@ import { Editor, Selection } from "../interfaces/editor"
 import { Operation } from "../interfaces/operation"
 import { createDraft, finishDraft, isDraft } from 'immer'
 import { Range } from '../interfaces/range';
-import { Node } from '../interfaces/node';
+import { Descendant, Node } from '../interfaces/node';
 import { Text } from "../interfaces/text";
 import { Point } from "../interfaces/point";
 import { Path } from "../interfaces/path";
@@ -80,6 +80,7 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       const node = Node.get(editor, path);
       const parent = Node.parent(editor, path);
       const index = path[path.length - 1];
+      let newNode: Descendant;
 
       if (Text.isText(node)) {
         const before = node.text.slice(0, position);
@@ -87,11 +88,18 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
         // 修改现有 node text
         node.text = before;
         // 在现有 node 后面插入新的 textNode
-        const newNode: Text = {
+        newNode = {
           text: after
-        }
-        parent.children.splice(index + 1, 0, newNode);
+        };
+      } else {
+        const before = node.children.slice(0, position);
+        const after = node.children.slice(position);
+        node.children = before;
+        newNode = {
+          children: after
+        };
       }
+      parent.children.splice(index + 1, 0, newNode);
 
       // splitNode 的 selection 会指向分割出来的那一个开头
       if (selection) {

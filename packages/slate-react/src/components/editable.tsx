@@ -48,7 +48,6 @@ export const Editable = (props: EditableProps) => {
   const Component = 'div';
   const editor = useSlate();
   const ref = useRef<HTMLDivElement>(null);
-  const deferredOperations = useRef<DeferredOperation[]>([]);
   const decorations = [];
 
   const onDOMSelectionChange = useCallback(throttle(() => {
@@ -168,24 +167,8 @@ export const Editable = (props: EditableProps) => {
       return;
     }
 
-    const { inputType, data } = event;
-    let isNative = false;
-
-    // TODO: 还不是很理解为什么这里对于单字符的插入要使用 浏览器接管渲染
-    // if (
-    //   inputType === 'insertText' &&
-    //   data &&
-    //   data.length === 1 &&
-    //   /[a-z ]/i.test(data) &&  // TODO：为什么做着限制
-    //   selection &&
-    //   Range.isCollapsed(selection)
-    // ) {
-    //   isNative = true;
-    // }
-
-    if (!isNative) {
-      event.preventDefault();
-    }
+    const { inputType, data, dataTransfer } = event;
+    event.preventDefault();
     console.log('onBeforeInput', event);
 
     const { selection } = editor;
@@ -200,21 +183,21 @@ export const Editable = (props: EditableProps) => {
     }
 
     switch (inputType) {
-      case 'insertText': {
-        if (typeof data === 'string') {
-          if (isNative) {
-            deferredOperations.current.push(() =>
-              Editor.insertText(editor, data)
-            )
-          } else {
-            Editor.insertText(editor, data)
-          }
+      case 'insertText':
+      case 'insertFromPaste': {
+        if (dataTransfer?.constructor.name === 'DataTransfer') {
+          ReactEditor.insertFragmentData(editor, dataTransfer);
+        } else if (typeof data === 'string') {
+          Editor.insertText(editor, data);
         }
         break;
       }
       case 'deleteContentBackward': {
         Editor.deleteBackward(editor);
         break;
+      }
+      case 'insertFromPaste': {
+        
       }
       default:
         break;
@@ -249,12 +232,6 @@ export const Editable = (props: EditableProps) => {
         // react 渲染多个空格的时候，默认只会渲染成一个空格，这个属性允许渲染多个
         whiteSpace: 'pre-wrap',
       }}
-      onInput={useCallback((event: React.SyntheticEvent) => {          
-        for (const op of deferredOperations.current) {
-          op();
-        }
-        deferredOperations.current = []
-      }, [])}
       onCompositionUpdate={useCallback((event: React.CompositionEvent<HTMLDivElement>) => {
         IS_COMPOSING.set(editor, true);
       }, [editor])}
@@ -274,6 +251,10 @@ export const Editable = (props: EditableProps) => {
           (editor as any).undo && (editor as any).undo();
           return;
         }
+      }, [])}
+      onCopy={useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        ReactEditor.setFragmentData(editor, event.clipboardData);
       }, [])}
     >
       <Children
