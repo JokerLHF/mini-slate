@@ -51,7 +51,6 @@ export const Node: NodeInterface = {
     if (!Array.isArray(value)) {
       return false
     }
-    // TODO: 原文有加缓存，暂时不清楚加缓存的作用
     const isNodeList = value.every(val => Node.isNode(val))
     return isNodeList
   },

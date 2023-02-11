@@ -72,10 +72,16 @@ const HomePage = () => {
     Transforms.splitNodes(editor);
   }, [editor]);
 
+  const handleInsertText = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    Transforms.insertText(editor, '测试的');
+  }, [editor]);
+
   return (
     <Slate editor={editor} value={initialValue}>
       <div onMouseDown={handleMark}>点我加粗</div>
       <div onMouseDown={handleSplitNodes}>点我splitNodes</div>
+      <div onMouseDown={handleInsertText}>点我 insertText</div>
       <Editable
         renderLeaf={renderLeaf}
       />

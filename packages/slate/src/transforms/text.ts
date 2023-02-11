@@ -50,11 +50,15 @@ export const TextTransforms: TextTransforms = {
         if (Range.isCollapsed(at)) {
           at = at.anchor
         } else {
-          // TODO: 非重合的处理方式
+          // 把对应的文本删除，随后插入
+          const [, end] = Range.edges(at);
+          const pointRef = Editor.pointRef(editor, end);
+          Transforms.delete(editor, { at });
+          at = pointRef.unref()!;
         }
       }
       // 3. at 是 point 的情况，可以直接使用
-  
+
       const { path, offset } = at;
       editor.apply({ type: 'insert_text', path, offset, text });
     });
