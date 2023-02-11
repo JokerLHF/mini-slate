@@ -23,6 +23,10 @@ export interface NodeTextsOptions {
   reverse?: boolean;
 }
 
+interface NodeLevelsOptions {
+  reverse?: boolean;
+}
+
 /**
  * slate 本身提供的
  */
@@ -38,7 +42,7 @@ export interface NodeInterface {
   texts: (root: Node, options?: NodeTextsOptions) => Generator<NodeEntry<Text>, void, undefined>;
   nodes: (root: Node, options?: NodeNodesOptions) => Generator<NodeEntry, void, undefined>;
   string: (node: Node) => string;
-  levels: (root: Node, path: Path) => Generator<NodeEntry, void, undefined>;
+  levels: (root: Node, path: Path, options?: NodeLevelsOptions) => Generator<NodeEntry, void, undefined>;
   fragment: (root: Node, range: Range) => Descendant[];
 }
 
@@ -144,6 +148,7 @@ export const Node: NodeInterface = {
     }
   },
   /**
+   * !!!!!! 如果是 reverse=true，那么 from to 就需要自己 倒序
    * 从 root 开始返回所有子节点
    * 从根节点开始：
    *  - 递归子节点，
@@ -222,8 +227,9 @@ export const Node: NodeInterface = {
   *levels(
     root: Node,
     path: Path,
+    options: NodeLevelsOptions = {}
   ): Generator<NodeEntry, void, undefined> {
-    for (const p of Path.levels(path)) {
+    for (const p of Path.levels(path, options)) {
       const n = Node.get(root, p);
       yield [n, p]
     }

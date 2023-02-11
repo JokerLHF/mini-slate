@@ -95,7 +95,7 @@ export const TextTransforms: TextTransforms = {
           !Path.isCommon(path, end.path)
         ) {
           matches.push(nodeEntry);
-          lastPath = path
+          lastPath = path;
         }
       }
       const pathRefs = Array.from(matches, ([, p]) => Editor.pathRef(editor, p));
@@ -118,7 +118,7 @@ export const TextTransforms: TextTransforms = {
       // 中间节点
       for (const pathRef of pathRefs) {
         const path = pathRef.unref()!;
-        Transforms.removeNode(editor, { at: path });
+        Transforms.removeNodes(editor, { at: path });
       }
 
       // 尾部节点
@@ -132,6 +132,16 @@ export const TextTransforms: TextTransforms = {
         offset: startOffset,
         text,
       });
+
+      if (
+        !isSingleText &&
+        endRef.current &&
+        startRef.current
+      ) {
+        Transforms.mergeNodes(editor, {
+          at: endRef.current,
+        });
+      }
 
       startRef.unref();
       endRef.unref();
@@ -279,7 +289,7 @@ export const TextTransforms: TextTransforms = {
         editor,
         !isInlineStart ? Path.next(inlinePath) : inlinePath
       );
-  
+
       Transforms.insertNodes(editor, starts, {
         at: startRef.current!,
       });

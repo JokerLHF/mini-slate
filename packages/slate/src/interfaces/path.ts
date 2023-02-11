@@ -4,6 +4,10 @@ import { Operation } from "./operation";
 
 export type Path = number[]
 
+interface PathLevelsOptions {
+  reverse?: boolean;
+}
+
 export interface PathInterface {
   isPath: (value: any) => value is Path;
   compare: (path: Path, another: Path) => -1 | 0 | 1;
@@ -16,8 +20,9 @@ export interface PathInterface {
   isAfter: (path: Path, another: Path) => boolean;
   isAncestor: (path: Path, another: Path) => boolean;
   isBefore: (path: Path, another: Path) => boolean;
+  isSibling: (path: Path, another: Path) => boolean;
   ancestors: (path: Path) => Path[];
-  levels: (path: Path) => Path[];
+  levels: (path: Path, options?: PathLevelsOptions) => Path[];
   transform(
     path: Path | null,
     op: Operation,
@@ -65,6 +70,17 @@ export const Path: PathInterface = {
    */
   isAncestor(path: Path, another: Path): boolean {
     return path.length < another.length && Path.compare(path, another) === 0
+  },
+
+  isSibling(path: Path, another: Path): boolean {
+    if (path.length !== another.length) {
+      return false;
+    }
+    const as = path.slice(0, -1);
+    const bs = another.slice(0, -1);
+    const al = path[path.length - 1];
+    const bl = another[another.length - 1];
+    return Math.abs(al - bl) === 1 && Path.equals(as, bs);
   },
 
   /**
@@ -155,18 +171,19 @@ export const Path: PathInterface = {
    * 返回 path 所有的父节点包括自己，比如[1, 2, 3]
    * 返回 [1], [1, 2] [1, 2, 3]
    */
-  levels(path: Path): Path[] {
+  levels(path: Path, options: PathLevelsOptions = {}): Path[] {
+    const { reverse = false } = options;
     const list: Path[] = []
     for (let i = 0; i <= path.length; i++) {
       list.push(path.slice(0, i));
     }
-    return list;
+    return reverse ? list.reverse() : list;
   },
 
   /**
    * path：[1,1] 
    * another：[1,2]
-   * 判断 path 是不是 another 前面
+   * path的父节点是 another 的祖先/父节点， 并且判断 path 是不是 another 前面， 
    */
   endsBefore(path: Path, another: Path): boolean {
     const i = path.length - 1
@@ -297,9 +314,114 @@ export const Path: PathInterface = {
             * [0,1]
             * [0,2]
             *   [0,2,1]
+            * 
             * [0,1] 合并到[0,0], 对于[0,2,1]来说就需要在 op.path.length - 1 处 -1
             */
             p[op.path.length - 1] -= 1;
+          }
+          /**
+           * 
+           * [0]
+           *  [0,0](AElement)
+           *     [0,0,0](BTextElement)
+           *  [0,1]
+           *     [0,1,0](CTextElement)
+           * 
+           * 希望 CTextElement 合并到 BTextElement，进行 mergeNode { path: [0, 1], position: 1 }
+           * 
+           * [0]
+           *  [0,0](AElement)
+           *     [0,0,0](BTextElement)
+           *     [0,0,1](CTextElement)
+           * 
+           * 对于[0,1,0]来说，
+           *    会合并到前一个分支，所以在 op.path -1,
+           *    因为是在前一个分支的 position 插入，所以 op.path.length + position
+           */
+          else if (Path.isAncestor(op.path, p)) {
+            p[op.path.length - 1] -= 1;
+            p[op.path.length] += op.position;
+          }
+          break;
+        }
+        case 'move_node': {
+          const { path, newPath } = op;
+          if (Path.equals(path, newPath)) {
+            return;
+          }
+          /**
+           * 1. 对 path 的子节点/自己的处理逻辑
+            * [0,0]
+            *   [0,0,0]
+            *     [0,0,0,0]
+            * [0,1]
+            * [0,2]
+            *   [0,2,1]
+            *   [0,2,2]
+            * 
+            * [0,0] 整体移动到 [0,2,2]，
+            *   那么对于 [0,0,0] 来说应该变为 [0,2,2,0]，
+            *   那么对于 [0,0,0,0] 来说应该变为 [0,2,2,0,0]
+            * 相当于原来原来公共父节点[0,0] 变成了 [0,2,2] 但是他的内部结构没有改变，在第几个子节点还是在第几个子节点，所以只需要改动公共父节点即可
+            * 
+            * [0,0] 移动之后相当于删除了一个节点，所以位置会发生变化。对于其 endsBefore 的需要改变一下位置
+           */
+          if (Path.isAncestor(path, p) || Path.equals(path, p)) {
+            const copyPath = newPath.slice();
+            // 删除了一个节点，需要改变位置
+            if (Path.endsBefore(path, p)) {
+              copyPath[path.length - 1] -= 1;
+            }
+            // 公共父节点 + 原来其子节点的位置
+            return copyPath.concat(p.slice(path.length));
+          } 
+          /**
+            * 2. 同层级的需要特殊处理，因为不会少或者增加节点，只是节点的移动。
+            * [0,0]
+            * [0,1]
+            * [0,2]
+            * 
+            * [0,0] 整体移动到 [0,2]，
+            *   那么对于 [0,1] 来说需要在 path.length - 1 地方 -1
+            * [0,2] 移动到 [0,0]
+            *   那么对于 [0,1] 来说需要在 path.length - 1 地方 +1
+           */
+          else if (Path.isSibling(path, newPath)) {
+            if (Path.endsBefore(path, p)) {
+              p[path.length - 1] -= 1;
+            } else {
+              p[path.length - 1] += 1;
+            }
+          }
+          /**
+            * 3. 跨层级会存在少或者增加节点，           
+            *    原来 op 同个父节点的 tree 就会少一个节点
+            *    原来 onp 同个父节点的 tree 就会多一个节点
+            * [0,0]
+            * [0,1]
+            * [0,2]
+            *   [0,2,1]
+            *   [0,2,2]
+            *   [0,2,3]
+            * 
+            * [0,0] 整体移动到 [0,2,2]，
+            *   那么对于 [0，2，3] 来说应该变为 [0，1，3]，因为相当于前面少了一个节点，位置发生了变化
+            *   对于[0,2,3] 应该变为[0,2,4], 因为相当于前面多了一个节点，位置发生变化
+            * 最终 [0,2,3]应该就是 [0,1,4]
+           */
+          else {
+            // 删除原来节点的影响
+            if (Path.endsBefore(path, p)) {
+              p[path.length - 1] -= 1;
+            }
+
+            if (
+              Path.equals(newPath, p) ||
+              Path.isAncestor(newPath, p) ||
+              Path.endsBefore(newPath, p)
+            ) {
+              p[newPath.length - 1] += 1;
+            }
           }
           break;
         }

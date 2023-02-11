@@ -20,6 +20,10 @@ export const createEditor = (): Editor => {
     isInline: () => false,
     marks: null,
 
+    insertBreak: () => {
+      Transforms.splitNodes(editor, { always: true })
+    },
+
     insertText: (text: string) => {
       const { selection, marks } = editor;
       if (!selection) {
@@ -204,7 +208,7 @@ export const createEditor = (): Editor => {
           if (Text.equals(child, prev, { isEqualText: false })) {
             Transforms.mergeNodes(editor, {
               at: path.concat(n),
-              position: prev.text.length,
+              match: n => Text.isText(n)
             });
             n--;
           }
@@ -212,7 +216,7 @@ export const createEditor = (): Editor => {
            * 规则2.2: 后一个节点时空直接删除
            */
           else if (child.text === '') {
-            Transforms.removeNode(editor, {
+            Transforms.removeNodes(editor, {
               at: path.concat(n)
             });
             n--;

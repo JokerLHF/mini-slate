@@ -14,29 +14,68 @@ interface SetNodeOptions {
 }
 
 interface SplitNodeOptions<T extends Node> {
-  at: Point;
+  at?: Location;
   always?: boolean;
-  match?: NodeMatch<T>,
-  mode?: SelectionMode,
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+}
+
+interface MergeNodeOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+}
+
+interface RemoveNodesOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+}
+
+interface MoveNodesOptions<T extends Node> {
+  // 通过这三个属性确定节点位置
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+  to: Path;
 }
 
 export interface NodeTransforms {
   insertNodes: (editor: Editor, nodes: Node | Node[], options?: { select?: boolean; at?: Location }) => void;
   splitNodes: <T extends Node>(editor: Editor, options: SplitNodeOptions<T>) => void;
   setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => void;
-  mergeNodes: (editor: Editor, options: { at: Path, position: number } ) => void;
-  removeNode: (editor: Editor, options: { at: Path }) => void;
+  mergeNodes: <T extends Node>(editor: Editor, options?: MergeNodeOptions<T>) => void;
+  removeNodes: <T extends Node>(editor: Editor, options?: RemoveNodesOptions<T>) => void;
+  moveNodes: <T extends Node>(editor: Editor, options: MoveNodesOptions<T>) => void;
 }
 
 export const NodeTransforms: NodeTransforms = {
   splitNodes: <T extends Node>(editor: Editor, options: SplitNodeOptions<T>) => {
     Editor.withoutNormalizing(editor, () => {
       const { 
-        at,
         always = false,
         match = n => Element.isElement(n),
         mode = 'lowest'
       } = options;
+
+      let { at = editor.selection } = options;
+      if (Path.isPath(at)) {
+        // TODO
+        return;
+      }
+
+      if (Range.isRange(at)) {
+        if (Range.isCollapsed(at)) {
+          at = at.anchor;
+        } else {
+          // TODO
+          return;
+        }
+      }
+
+      if (!at) {
+        return;
+      }
 
       const [highest] = Editor.nodes(editor, { at, match, mode });
       const [_, highestPath] = highest || [];
@@ -217,23 +256,186 @@ export const NodeTransforms: NodeTransforms = {
     });
   },
 
-  mergeNodes: (editor: Editor, options: { at: Path, position: number }) => {
+  /**
+   * mergeNodes 实现起来比较麻烦，需要考虑 currentNode prevNode 是不是同一个层级。不同层级要先 moveNode 才能 mergeNode
+   * 
+   * 那么如何判断是否同一个层级呢？Path.next(currentPath) 拿到的就是和 currentPath 同一个层级的
+   * 
+   * 实现上会使用 Editor.previous 拿到上一个节点，但是此时的 previous 是根据 document 分布计算的，
+   * 也就是说 previous 跟 currentPath 可能不是同一个层级。这个实现上没有问题，因为合并是 document 视图的合并，
+   * 但是视图数据上需要做处理，先 moveNode， 将由来分支剩下的节点删除，才能 mergeNode
+   */
+  mergeNodes: <T extends Node>(
+    editor: Editor, 
+    options: MergeNodeOptions<T> = {}
+  ): void => {
     Editor.withoutNormalizing(editor, () => {
+      let { match } = options;
+      const { mode = 'lowest', at = editor.selection  } = options;
+      if (!at) {
+        return
+      }
+      // 1. 默认使用 element 去合并，所以 match 默认值是获取 block
+      if (!match) {
+        // path 默认的 previous 需要有同一个 parent
+        if (Path.isPath(at)) {
+          const [parent] = Editor.parent(editor, at)
+          match = n => parent.children.includes(n)
+        } else {
+          match = (node) => Element.isElement(node)
+        }
+      }
+
+      // 2. 通过 Editor.nodes 返回符合 match 的 node.
+      // 通过 Editor.previous 返回 match 的 previousNode
+      const [currentNodeEntry] = Editor.nodes(editor, { at, mode, match });
+      const prevNodeEntry = Editor.previous(editor, { at, mode, match });
+      if (!currentNodeEntry || !prevNodeEntry) {
+        return
+      }
+
+      const [currentNode, currentPath] = currentNodeEntry;
+      const [prevNode, prevPath] = prevNodeEntry;
+      // 3. 拿到同一个层级的数据，判断是否是同层级
+      const isPreviousSibling = Path.isSibling(currentPath, prevPath)
+      
+      // 4. 往上寻找空的父节点
+      const commonPath = Path.common(currentPath, prevPath);
+      const emptyAncestor = Editor.above(editor, {
+        at: currentPath,
+        // 到公共 path 就可以停止了
+        match: (n, p) => {
+          return Path.isAncestor(commonPath, p) && hasSingleChildNest(editor, n)
+        }
+      });
+      // 下面的移动可能会对当前 emptyAncestor 造成影响，所以需要 pathRef 一下
+      const emptyPathRef = emptyAncestor && Editor.pathRef(editor, emptyAncestor[1]);
+
+      if (!isPreviousSibling) {
+        // node 要移动到这个 newPath
+        const newPath = Path.next(prevPath);
+        Transforms.moveNodes(editor, { to: newPath, at: currentPath });
+      }
+
+      if (emptyPathRef) {
+        Transforms.removeNodes(editor, { at: emptyPathRef.current! });
+      }
+
+      let position;
+      if (Text.isText(currentNode) && Text.isText(prevNode)) {
+        position = prevNode.text.length;
+      } else if (Element.isElement(currentNode) && Element.isElement(prevNode)) {
+        position = prevNode.children.length
+      } else {
+        throw new Error('mergeNodes 前后节点不一致')
+      }
+      // 4. 计算 position 和 path
       editor.apply({
         type: 'merge_node',
-        path: options.at,
-        position: options.position
+        path: Path.next(prevPath),
+        position,
       });
     });
   },
 
-  removeNode: (editor: Editor, options: { at: Path }) => {
+  removeNodes: <T extends Node>(
+    editor: Editor,
+    options: RemoveNodesOptions<T> = {},
+  ) => {
     Editor.withoutNormalizing(editor, () => {
-      editor.apply({
-        type: 'remove_node',
-        path: options.at,
-        node: Node.get(editor, options.at),
+      const { at = editor.selection, mode = 'lowest' } = options;
+      let { match } = options;
+  
+      if (!at) {
+        return;
+      }
+  
+      // 默认是删除 elemnt
+      if (!match) {
+        // 如果是 path 默认从 path 开始删除
+        if (Path.isPath(at)) {
+          const node = Node.get(editor, at);
+          match = (n) => n === node;
+        } else {
+          // 如果是 range 或者 point，只要是 element（非editor）就可以删除
+          match = (n) => Element.isElement(n);
+        }
+      }
+      const nodeEntrys = Editor.nodes(editor, { match, at, mode });
+      const pathRefs = Array.from(nodeEntrys, ([_, path]) => {
+        return Editor.pathRef(editor, path);
       });
+  
+      for (const pathRef of pathRefs) {
+        const path = pathRef.unref();
+        if (!path) {
+          continue;
+        }
+        editor.apply({
+          type: 'remove_node',
+          path,
+          node: Node.get(editor, path),
+        });
+      }
     });
+  },
+
+  moveNodes: <T extends Node>(
+    editor: Editor,
+    options: MoveNodesOptions<T>,
+  ) => {
+    const {
+      mode = 'lowest',
+      at = editor.selection,
+      to,
+    } = options;
+
+    let { match } = options;
+    if (!at) {
+      return;
+    }
+
+    if (!match) {
+      // 如果是 path 默认从 at 开始移动
+      if (Path.isPath(at)) {
+        const node = Node.get(editor, at);
+        match = (n) => n === node;
+      } else {
+        // 如果是 range 或者 point，只要是 element（非editor）就可以移动
+        match = (n) => Element.isElement(n);
+      }
+    }
+
+    const toRef = Editor.pathRef(editor, to);
+    const nodeEntrys = Editor.nodes(editor, { mode, at, match });
+    const pathRefs = Array.from(nodeEntrys, ([_, p]) => Editor.pathRef(editor, p));
+
+    for (const pathRef of  pathRefs) {
+      const path = pathRef.unref();
+      const newPath = toRef.current;
+      // path.length === 0 为 editor
+      if (!path || !newPath || !path.length || !newPath.length) {
+        continue;
+      }
+      editor.apply({ type: 'move_node', path, newPath });
+      toRef.current = Path.next(newPath);
+    }
+
+    toRef.unref();
+  },
+}
+
+const hasSingleChildNest = (editor: Editor, node: Node): boolean => {
+  if (Element.isElement(node)) {
+    const element = node as Element;
+    if (element.children.length === 1) {
+      return hasSingleChildNest(editor, element.children[0])
+    } else {
+      return false
+    }
+  } else if (Editor.isEditor(node)) {
+    return false
+  } else {
+    return true
   }
 }

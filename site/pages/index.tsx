@@ -11,7 +11,11 @@ const initialValue: Descendant[] = [
       { children: [{text: '333'}] },
       { children: [{text: '444'}] },
       { children: [{text: '555'}] },
-      { children: [{text: '666'}] },
+      { children: [
+        { children: [
+          { children: [{text: '666'}]}
+        ]}
+      ] },
     ]
   },
 ]

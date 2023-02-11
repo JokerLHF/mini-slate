@@ -4,6 +4,7 @@ import { createDraft, finishDraft, isDraft } from 'immer'
 import { Range } from '../interfaces/range';
 import { Descendant, Node } from '../interfaces/node';
 import { Text } from "../interfaces/text";
+import { Element } from "../interfaces/element";
 import { Point } from "../interfaces/point";
 import { Path } from "../interfaces/path";
 
@@ -110,6 +111,34 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       break;
     }
 
+    case 'merge_node': {
+      const { path } = op;
+      const parent = Node.parent(editor, path);
+      const index = path[path.length - 1];
+
+      const currentNode = Node.get(editor, path);
+      const prevPath = Path.previous(path);
+      const prevNode = Node.get(editor, prevPath);
+
+      if (Text.isText(prevNode) && Text.isText(currentNode)) {
+        // 两个 text 合并，text 合并到前一个，并且删掉当前 textNode
+        prevNode.text += currentNode.text;
+      } else if (Element.isElement(prevNode) && Element.isElement(currentNode)) {
+        prevNode.children.push(...currentNode.children)
+      } else {
+        throw new Error('mergeNodes 前后节点不一致')
+      }
+
+      parent.children.splice(index, 1);
+
+      if (selection) {
+        const { anchor, focus } = selection;
+        selection.anchor = Point.transform(anchor, op)!;
+        selection.focus = Point.transform(focus, op)!;
+      }
+      break;
+    }
+
     case 'insert_node': {
       const { path, node } = op;
       const parent = Node.parent(editor, path);
@@ -166,21 +195,25 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
       }
       break;
     }
-    case 'merge_node': {
+    case 'move_node': {
       const { path } = op;
+      /**
+       * 1. 删除 path 节点
+       */
+      const node = Node.get(editor, path);
       const parent = Node.parent(editor, path);
       const index = path[path.length - 1];
+      parent.children.splice(index, 1);
+      /**
+       * 2.删除 path 节点之后 newPath 也会发生改变，需要通过对 path 进行 transform 得到正确的位置
+       *   在新的位置上插入新节点
+       */
+      const truePath = Path.transform(path, op)!;
+      const newParent = Node.parent(editor, truePath);
+      const newIndex = truePath[truePath.length - 1];
+      newParent.children.splice(newIndex, 0, node);
 
-      const currentNode = Node.get(editor, path);
-      const prevPath = Path.previous(path);
-      const prevNode = Node.get(editor, prevPath);
-
-      if (Text.isText(prevNode) && Text.isText(currentNode)) {
-        // 两个 text 合并，text 合并到前一个，并且删掉当前 textNode
-        prevNode.text += currentNode.text;
-        parent.children.splice(index, 1);
-      }
-
+      // 光标跟随节点移动，
       if (selection) {
         const { anchor, focus } = selection;
         selection.anchor = Point.transform(anchor, op)!;

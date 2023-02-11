@@ -143,6 +143,10 @@ export const Point: PointInterface = {
           p.path = Path.transform(path, op)!;
           break;
         }
+        case 'move_node': {
+          p.path = Path.transform(path, op)!;
+          break;
+        }
       }
     })
   }

@@ -1,4 +1,4 @@
-import { Descendant, NodeEntry } from "./node";
+import { Ancestor, Descendant, NodeEntry } from "./node";
 import { isPlainObject } from 'is-plain-object';
 import { Node } from './node';
 import { Operation } from "./operation";
@@ -58,6 +58,16 @@ export interface EditorAboveOptions<T extends Node> {
   reverse?: boolean;
 }
 
+export interface EditorPreviousOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+}
+
+export interface EditorParentOptions {
+  edge?: LeafEdge
+}
+
 export interface PointRefOptions {
   affinity: TextDirection | null
 }
@@ -96,6 +106,7 @@ export interface BaseEditor {
 
   getFragment: () => Descendant[];
   insertFragment: (data: Node[]) => void;
+  insertBreak: () => void;
 }
 
 export type Editor = ExtendedType<BaseEditor>;
@@ -110,9 +121,18 @@ export interface EditorInterface {
   nodes: <T extends Node>(
     editor: Editor,
     options?: EditorNodesOptions<T>
-  ) => Generator<NodeEntry, void, undefined>;
+  ) => Generator<NodeEntry<T>, void, undefined>;
 
-  before: (editor: Editor,at: Location) => Point | undefined;
+  before: (editor: Editor, at: Location) => Point | undefined;
+  previous: <T extends Node>(
+    editor: Editor,
+    options?: EditorPreviousOptions<T>
+  ) => NodeEntry<T> | undefined;
+  parent: (
+    editor: Editor,
+    at: Location,
+    options?: EditorParentOptions
+  ) => NodeEntry<Ancestor>;
   positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>;
   addMark: (editor: Editor, key: string, value: any) => void;
 
@@ -161,6 +181,8 @@ export interface EditorInterface {
   setNormalizing: (editor: Editor, isNormalizing: boolean) => void;
   withoutNormalizing: (editor: Editor, fn: () => void) => void;
   normalize: (editor: Editor) => void;
+
+  insertBreak: (editor: Editor) => void;
 }
 
 export const Editor: EditorInterface = {
@@ -179,8 +201,13 @@ export const Editor: EditorInterface = {
       && typeof value.normalizeNode === 'function'
       && typeof value.getFragment === 'function'
       && typeof value.insertFragment === 'function'
+      && typeof value.insertBreak === 'function'
       && (value.selection === null || Range.isRange(value.selection));
     return isEditor
+  },
+
+  insertBreak (editor: Editor) {
+    editor.insertBreak();
   },
 
   getDirtyPaths (op: Operation) {
@@ -294,7 +321,7 @@ export const Editor: EditorInterface = {
   },
 
   /**
-   * 根据 location 找到 slateTextNode
+   * 根据 location 找到 slateElement
    */
   node(
     editor: Editor,
@@ -306,10 +333,16 @@ export const Editor: EditorInterface = {
     return [node, path]
   },
 
+  /**
+   * 根据 location 计算出 node 的范围， 
+   * 根据 mode 模式，返回符合 match 的节点
+   * 
+   * 目前对这个 api 的使用理解上还不是很好，
+   */
   *nodes<T extends Node>(
     editor: Editor,
     options: EditorNodesOptions<T> = {}
-  ) {
+  ): Generator<NodeEntry<T>, void, undefined> {
     const {
       at = editor.selection,
       match = () => true,
@@ -320,7 +353,7 @@ export const Editor: EditorInterface = {
     if (!at) {
       return;
     }
-    // 1. 计算 from to
+    // 1. 计算 from to， 
     const first = Editor.path(editor, at, { edge: 'start' });
     const last = Editor.path(editor, at, { edge: 'end' });
     const from = reverse ? last : first;
@@ -332,9 +365,10 @@ export const Editor: EditorInterface = {
       reverse
     });
 
-    let lastNodeEntry: NodeEntry | undefined;
+    let lastNodeEntry: NodeEntry<T> | undefined;
 
     for (const [node, path] of nodeEntrys) {
+      // 0 表示 path 和 another 是祖先关系或者相等关系
       const isLower = lastNodeEntry && Path.compare(path, lastNodeEntry[1]) === 0;
       // highest 模式下，一条路径只返回最高的，其他的都抛弃。等待变量到另外一条路径
       if (mode === 'highest' && isLower) {
@@ -347,11 +381,11 @@ export const Editor: EditorInterface = {
 
       // lowest 模式下找到更低的匹配 
       if (mode === 'lowest' && isLower) {
-        lastNodeEntry = [node, path]
+        lastNodeEntry = [node, path];
         continue;
       }
       // lowest 模式找到遇到不是更低的匹配就证明上一条路径已经匹配忘了，找到最低的了，返回上一次的
-      const emit: NodeEntry | undefined = mode === 'lowest' ? lastNodeEntry : [node, path];
+      const emit: NodeEntry<T> | undefined = mode === 'lowest' ? lastNodeEntry : [node, path];
       if (emit) {
         yield emit;
       }
@@ -373,40 +407,48 @@ export const Editor: EditorInterface = {
     if (!at) {
       return;
     }
-
-    const firstPath = Editor.path(editor, at, { edge: 'start' });
-    const lastPath = Editor.path(editor, at, { edge: 'end' });
-  
+    
     const range = Editor.range(editor, at);
     const [start, end] = Range.edges(range);
-  
-    for (const textEntry of Node.texts(editor, { from: lastPath, to: firstPath, reverse })) {
-      const [textNode, textNodePath] = textEntry;      
+    const firstPath = reverse ? end.path : start.path;
+    const lastPath = reverse ? start.path : end.path;
+
+    for (const textEntry of Node.texts(editor, { 
+      from: firstPath,
+      to: lastPath,
+      reverse
+    })) {
+      const [textNode, textNodePath] = textEntry;
+      const isFirst = Path.equals(textNodePath, firstPath)
+      const isEnd = Path.equals(textNodePath, lastPath)
+
       if (reverse) {
         let offset = textNode.text.length;
         while(true) {
-          if (offset > end.offset) {
+          if (isFirst && offset > end.offset) {
             offset--;
             continue;
           }
-          if (offset < start.offset) {
+          const startOffset = isEnd ? start.offset : 0;
+          if (offset < startOffset) {
             break;
           }
           yield { path: textNodePath, offset }
           offset--;
         }
-        return;
+        continue;
       }
 
       let offset = 0;
       while(true) {
         // 在开始point之前不参与
-        if (offset < start.offset) {
+        if (isFirst && offset < start.offset) {
           offset++;
           continue;
         }
         // 在结束point之后表示
-        if (offset > textNode.text.length - end.offset) {
+        const endOffset = isEnd ? textNode.text.length - end.offset : textNode
+        if (offset > endOffset) {
           break;
         }
         yield { path: textNodePath, offset }
@@ -436,7 +478,10 @@ export const Editor: EditorInterface = {
         break;
       }
 
-      target = node;
+      // 排除掉 at 自己
+      if (d !== 0) {
+        target = node;
+      }
       d++;
     }
 
@@ -464,7 +509,9 @@ export const Editor: EditorInterface = {
   },
 
   /**
-   * 向上找到第一个 match 的节点（除了本身）
+   * 向上找到第一个 match 的节点（除了本身）,
+   *  默认是从 ediotr 到节点路径往下
+   *  reverse 则是从节点到 editor 往上
    */
   above<T extends Node>(
     editor: Editor,
@@ -484,11 +531,61 @@ export const Editor: EditorInterface = {
     }
   },
 
+  /**
+   * Get the parent node of a location.
+   */
+  parent(
+    editor: Editor,
+    at: Location,
+    options: EditorParentOptions = {}
+  ): NodeEntry<Ancestor> {
+    const path = Editor.path(editor, at, options)
+    const parentPath = Path.parent(path)
+    const entry = Editor.node(editor, parentPath)
+    return entry as NodeEntry<Ancestor>
+  },
+
+  previous<T extends Node>(
+    editor: Editor,
+    options: EditorPreviousOptions<T> = {}
+  ): NodeEntry<T> | undefined {
+    const { at = editor.selection,  mode = 'lowest', } = options;
+    let { match } = options;
+    if (!at) {
+      return;
+    }
+
+    // 1. 找到 beforePoint
+    const beforePoint = Editor.before(editor, at);
+    if (!beforePoint) {
+      return;
+    }
+    const start = Editor.point(editor, [], { edge: 'start' });
+    // 2. match 默认是 true，path 是 parent.includes(p)
+    if (!match) {
+      if (Path.isPath(at)) {
+        const [parent] = Editor.parent(editor, at)
+        match = n => parent.children.includes(n)
+      } else {
+        match = () => true;
+      }
+    }
+    // 3 . 遍历从最左边到 beforePoint 的节点，找到符合 match 的节点
+    const [prev] = Editor.nodes(editor, {
+      at: { anchor: start, focus: beforePoint },
+      reverse: true,
+      match,
+      mode
+    });
+
+    return prev;
+  },
+
   *levels<T extends Node>(
     editor: Editor,
     options: EditorLevelsOptions<T> = {}
   ): Generator<NodeEntry<T>, void, undefined> {
-    let { at = editor.selection, match, reverse } = options;
+    let { at = editor.selection, match, reverse = false } = options;
     if (!at) {
       return;
     }
@@ -501,15 +598,11 @@ export const Editor: EditorInterface = {
     // 获取最底层的 textSlateNode 的 path 
     const path = Editor.path(editor, at);
 
-    for (const [n, p] of Node.levels(editor, path)) {
+    for (const [n, p] of Node.levels(editor, path, { reverse })) {
       if (!match(n, p)) {
         continue;
       }
       levels.push([n, p]);
-    }
-
-    if (reverse) {
-      levels.reverse()
     }
 
     // 这个是什么语法 跟 yied levels 有什么不同？？

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { useChildren } from '../hooks/use-children';
 import { useSlate } from '../hooks/use-slate';
 import { Element, Text, Transforms, Range, NodeEntry, Editor } from 'slate';
@@ -25,8 +25,6 @@ export interface RenderLeafProps {
     'data-slate-leaf': true
   }
 }
-
-type DeferredOperation = () => void;
 
 export type EditableProps = {
   renderElement?: (props: RenderElementProps) => JSX.Element
@@ -184,7 +182,7 @@ export const Editable = (props: EditableProps) => {
 
     switch (inputType) {
       case 'insertText':
-      case 'insertFromPaste': {
+      case 'insertFromPaste': { // command+v
         if (dataTransfer?.constructor.name === 'DataTransfer') {
           ReactEditor.insertFragmentData(editor, dataTransfer);
         } else if (typeof data === 'string') {
@@ -192,12 +190,13 @@ export const Editable = (props: EditableProps) => {
         }
         break;
       }
-      case 'deleteContentBackward': {
+      case 'deleteContentBackward': { // 单选删除
         Editor.deleteBackward(editor);
         break;
       }
-      case 'insertFromPaste': {
-        
+      case 'insertParagraph': { // 换行
+        Editor.insertBreak(editor);
+        break;
       }
       default:
         break;
@@ -219,7 +218,7 @@ export const Editable = (props: EditableProps) => {
       ...marks,
     })
   }
-  
+
   return (
     <Component
       ref={ref}
@@ -252,7 +251,7 @@ export const Editable = (props: EditableProps) => {
           return;
         }
       }, [])}
-      onCopy={useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
+      onCopy={useCallback((event: React.ClipboardEvent<HTMLDivElement>) => { // command+c
         event.preventDefault();
         ReactEditor.setFragmentData(editor, event.clipboardData);
       }, [])}

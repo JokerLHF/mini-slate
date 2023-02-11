@@ -52,7 +52,11 @@ export type BaseNodeOperation = {
   path: Path;
   newProperties: Partial<Node>;
   properties: Partial<Node>;
-} 
+} | {
+  type: 'move_node';
+  path: Path;
+  newPath: Path;
+}
 
 export type Operation = BaseTextOperation | BaseSetSelectionOperation | BaseNodeOperation;
 
@@ -69,7 +73,6 @@ export const Operation: OperationInterface = {
     switch(op.type) {
       case 'set_selection': {
         const { properties, newProperties } = op
-
         if (properties == null) {
           return {
             ...op,
@@ -122,6 +125,14 @@ export const Operation: OperationInterface = {
        */
       case 'split_node': {
         return { ...op, type: 'merge_node', path: Path.next(op.path) }
+      }
+      /**
+       * 之前是从 path 移动到 newPath
+       * 相反的话需要从 newPath 移动到 path
+       */
+      case 'move_node': {
+        const { path, newPath } = op;
+        return { ...op, path: newPath, newPath: path };
       }
     }
   }
