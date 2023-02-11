@@ -224,6 +224,7 @@ export const Editor: EditorInterface = {
     return Point.equals(start, point);
   },
 
+  // point is edge in at
   isEdge (editor: Editor, point: Point, at: Location): boolean {
     return Editor.isStart(editor, point, at) || Editor.isEnd(editor, point, at);
   },

@@ -42,7 +42,7 @@ interface MoveNodesOptions<T extends Node> {
 
 export interface NodeTransforms {
   insertNodes: (editor: Editor, nodes: Node | Node[], options?: { select?: boolean; at?: Location }) => void;
-  splitNodes: <T extends Node>(editor: Editor, options: SplitNodeOptions<T>) => void;
+  splitNodes: <T extends Node>(editor: Editor, options?: SplitNodeOptions<T>) => void;
   setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => void;
   mergeNodes: <T extends Node>(editor: Editor, options?: MergeNodeOptions<T>) => void;
   removeNodes: <T extends Node>(editor: Editor, options?: RemoveNodesOptions<T>) => void;
@@ -50,62 +50,60 @@ export interface NodeTransforms {
 }
 
 export const NodeTransforms: NodeTransforms = {
-  splitNodes: <T extends Node>(editor: Editor, options: SplitNodeOptions<T>) => {
+  splitNodes: <T extends Node>(
+    editor: Editor,
+    options: SplitNodeOptions<T> = {}
+  ) => {
     Editor.withoutNormalizing(editor, () => {
-      const { 
-        always = false,
-        match = n => Element.isElement(n),
-        mode = 'lowest'
-      } = options;
+      const {  mode = 'lowest' } = options;
+      let { at = editor.selection, match, always = false } = options;
+      let depth = 0;
 
-      let { at = editor.selection } = options;
+      // path 需要拿到 父节点，因为 splitNode 如果是 Path 是根据父节点删除子节点的逻辑处理
       if (Path.isPath(at)) {
-        // TODO
-        return;
+        const point = Editor.point(editor, at);
+        const [parent] = Editor.parent(editor, at);
+        match = n => n === parent;
+        depth = at.length -1;
+        always = true;
+        at = point;
       }
 
       if (Range.isRange(at)) {
         if (Range.isCollapsed(at)) {
           at = at.anchor;
         } else {
-          // TODO
-          return;
+          // range 的话要先删除掉 range
+          const [, end] = Range.edges(at);
+          const endRef = Editor.pointRef(editor, end);
+          Transforms.delete(editor, { at });
+          at = endRef.unref();          
         }
+        match = n => Text.isText(n)
+      }
+
+      if (!match) {
+        match = n =>  Element.isElement(n);
       }
 
       if (!at) {
         return;
       }
 
-      const [highest] = Editor.nodes(editor, { at, match, mode });
-      const [_, highestPath] = highest || [];
+      const [highestNodeEntry] = Editor.nodes(editor, { at, match, mode });
+      const [, highestPath] = highestNodeEntry;
       if (!highestPath) {
         return;
       }
+      const position = depth ? at.path[depth]: at.offset;
 
-      const lowestPath = at.path;
-      let position = at.offset;
-
-      for (const [_, path] of Editor.levels(editor, { 
-        at: lowestPath,
-        reverse: true,
-      })) {
-        let split = false;
-        if (path.length < highestPath.length || !path.length) {
-          break
-        }
-        // 处于节点最左边或者最右边不处理
-        if (always || !Editor.isEdge(editor, at, path)) {
-          split = true;
-          editor.apply({
-            type: 'split_node',
-            position,
-            path,
-          });
-        }
-        // 第一次 position 是用来 split SlateTextNode 的，
-        // 后续的 position 是用来 split Slate ElementNode 的
-        position = path[path.length - 1] + (split ? 1 : 0)
+      // 处于节点最左边或者最右边不处理
+      if (always || !Editor.isEdge(editor, at, at.path)) {
+        editor.apply({
+          type: 'split_node',
+          position,
+          path: highestPath,
+        });
       }
     });
   },

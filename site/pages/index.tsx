@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
-import { Editable, withReact, Slate, RenderElementProps, RenderLeafProps } from 'slate-react';
-import { createEditor, Element, Editor, Descendant, Text } from 'slate';
+import React, { useCallback, useMemo } from 'react'
+import { Editable, withReact, Slate, RenderLeafProps } from 'slate-react';
+import { createEditor, Editor, Descendant, Transforms } from 'slate';
 import { withHistory } from 'slate-history';
 
 const initialValue: Descendant[] = [
@@ -67,13 +67,15 @@ const HomePage = () => {
     Editor.addMark(editor, 'bold', true);
   }, [editor]);
 
-  // useEffect(() => {
-  //   Editor.normalize(editor);
-  // }, []);
+  const handleSplitNodes = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    Transforms.splitNodes(editor);
+  }, [editor]);
 
   return (
     <Slate editor={editor} value={initialValue}>
       <div onMouseDown={handleMark}>点我加粗</div>
+      <div onMouseDown={handleSplitNodes}>点我splitNodes</div>
       <Editable
         renderLeaf={renderLeaf}
       />
