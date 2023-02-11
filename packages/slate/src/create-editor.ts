@@ -64,7 +64,7 @@ export const createEditor = (): Editor => {
         editor.marks = { [key]: value };
         editor.onChange();
       } else {
-        Transforms.setNode(editor, { [key]: value });
+        Transforms.setNodes(editor, { [key]: value });
       }
     },
 

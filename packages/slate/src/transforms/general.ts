@@ -90,6 +90,7 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
         node.text = before;
         // 在现有 node 后面插入新的 textNode
         newNode = {
+          ...node,
           text: after
         };
       } else {
@@ -97,6 +98,7 @@ const applyToDraft = (editor: Editor, selection: Selection, op: Operation): Sele
         const after = node.children.slice(position);
         node.children = before;
         newNode = {
+          ...node,
           children: after
         };
       }

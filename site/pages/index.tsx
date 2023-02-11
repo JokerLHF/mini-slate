@@ -62,9 +62,15 @@ const HomePage = () => {
   const editor = useMemo(() => withHistory(withReact(createEditor())), []);
   const renderLeaf = useCallback(props => <Leaf {...props} />, [])
 
-  const handleMark = useCallback((event: React.MouseEvent) => {
+  const handleMarkBold = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     Editor.addMark(editor, 'bold', true);
+    // Transforms.setNodes(editor, { 'bold': true }, { at: [0, 1] });
+  }, [editor]);
+
+  const handleMarkItalic = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    Editor.addMark(editor, 'italic', true);
   }, [editor]);
 
   const handleSplitNodes = useCallback((event: React.MouseEvent) => {
@@ -79,7 +85,8 @@ const HomePage = () => {
 
   return (
     <Slate editor={editor} value={initialValue}>
-      <div onMouseDown={handleMark}>点我加粗</div>
+      <div onMouseDown={handleMarkBold}>点我加粗</div>
+      <div onMouseDown={handleMarkItalic}>点我斜体</div>
       <div onMouseDown={handleSplitNodes}>点我splitNodes</div>
       <div onMouseDown={handleInsertText}>点我 insertText</div>
       <Editable

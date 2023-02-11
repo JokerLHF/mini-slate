@@ -9,8 +9,9 @@ import { Range } from "../interfaces/range";
 import { Text } from "../interfaces/text";
 import { SelectionMode } from '../interfaces/types';
 
-interface SetNodeOptions {
+interface SetNodeOptions<T extends Node> {
   at?: Location;
+  match?: NodeMatch<T>;
 }
 
 interface SplitNodeOptions<T extends Node> {
@@ -43,7 +44,7 @@ interface MoveNodesOptions<T extends Node> {
 export interface NodeTransforms {
   insertNodes: (editor: Editor, nodes: Node | Node[], options?: { select?: boolean; at?: Location }) => void;
   splitNodes: <T extends Node>(editor: Editor, options?: SplitNodeOptions<T>) => void;
-  setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => void;
+  setNodes: <T extends Node>(editor: Editor, props: Partial<Node>, options?: SetNodeOptions<T>) => void;
   mergeNodes: <T extends Node>(editor: Editor, options?: MergeNodeOptions<T>) => void;
   removeNodes: <T extends Node>(editor: Editor, options?: RemoveNodesOptions<T>) => void;
   moveNodes: <T extends Node>(editor: Editor, options: MoveNodesOptions<T>) => void;
@@ -185,9 +186,13 @@ export const NodeTransforms: NodeTransforms = {
   /**
    * 1. 对于在 range 中 insertNode，如果 range 是 collapsed 不处理，如果是非collaspd，将选中的 range 进行 splitNode
    */
-  setNode: (editor: Editor, props: Partial<Node>, options?: SetNodeOptions) => {
+  setNodes: <T extends Node>(
+    editor: Editor,
+    props: Partial<Node>,
+    options: SetNodeOptions<T> = {},
+  ) => {
     Editor.withoutNormalizing(editor, () => {
-      let { at = editor.selection } = options || {};
+      let { at = editor.selection, match } = options;
       if (!at) {
         return;
       }
@@ -210,45 +215,39 @@ export const NodeTransforms: NodeTransforms = {
         if (!options?.at) {
           Transforms.select(editor, at);
         }
+      }
 
-        // 2. 对选区的节点增加 mark
-        for (const [textNode, textNodePath] of Node.texts(editor, { 
-          from: at.anchor.path, 
-          to: at.focus.path,
-          reverse: Range.isBackward(at),
-        })) {
-          let hasChanges = false;
+      if (!match) {
+        match = n => Text.isText(n);
+      }
 
-          const oldProperties = {};
-          for (const o in textNode) {
-            if (o === 'children' || o === 'text') {
-              continue
-            }
-            oldProperties[o] = textNode[o];
+      // 2. 对选区的节点增加 mark
+      for (const [node, nodePath] of Editor.nodes(editor, { at, match })) {
+        let hasChanges = false;
+        const oldProperties = {};
+        const newProperties = {};
+
+        for (const k in props) {
+          if (k === 'children' || k === 'text') {
+            continue;
           }
 
-          for (const k in props) {
-            if (k === 'children' || k === 'text') {
-              continue
-            }
-  
-            if (props[k] !== oldProperties[k]) {
-              hasChanges = true;
-              break;
-            }
+          // 只记录不一致的, newProperties 表示最新的，oldProperties 表示之前的。方便做 undo
+          if (props[k] !== node[k]) {
+            oldProperties[k] = node[k];
+            newProperties[k] = props[k];
+            hasChanges = true;
+            break;
           }
-  
-          /**
-         * TODO: 思考如果这里只存差异点是不是好一点？这种全量方式在协同冲突是不是无解了？
-         */
-          if (hasChanges) {
-            editor.apply({
-              type: 'set_node',
-              newProperties: props,
-              properties: oldProperties,
-              path: textNodePath,
-            })
-          }
+        }
+
+        if (hasChanges) {
+          editor.apply({
+            type: 'set_node',
+            newProperties: props,
+            properties: oldProperties,
+            path: nodePath,
+          })
         }
       }
     });
