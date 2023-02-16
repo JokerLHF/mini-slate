@@ -135,6 +135,8 @@ export interface EditorInterface {
     options?: EditorParentOptions
   ) => NodeEntry<Ancestor>;
   positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>;
+
+  marks: (editor: Editor) => Record<string, any>;
   addMark: (editor: Editor, key: string, value: any) => void;
   removeMark: (editor: Editor, key: string) => void;
 
@@ -240,6 +242,41 @@ export const Editor: EditorInterface = {
     editor.removeMark(key)
   },
 
+  marks(ediotr: Editor): Record<string, any> {
+    const { selection } = ediotr;
+    if (!selection) {
+      return {};
+    }
+
+    // 选区扩展的时候，拿到选区第一个节点
+    if (!Range.isCollapsed(selection)) {
+      const [match] = Editor.nodes(ediotr, { match: Text.isText });
+      if (!match) {
+        return {};
+      }
+      const [node] = match;
+      const { text, ...rest } = node;
+      return rest;
+    } 
+    // 选区折叠的时候根据选区
+    const { anchor: { path, offset }} = selection;
+    const [node] = Editor.node(ediotr, path);
+    /**
+     * 假设【】表示加粗：
+     * 现有：111 光标【222】。此时光标应该属于前一个节点 111 的
+     */
+    if (offset === 0) {
+      // 拿到前一个 textNode
+      const [prev] = Editor.previous(ediotr, { at: path, match: Text.isText }) || [];
+      if (prev) {
+        const { text, ...rest } = prev;
+        return rest;
+      }
+    }
+
+    const { text, ...rest } = node;
+    return rest;
+  },
   /**
    * 根据 location 中得到 textNode range
    */

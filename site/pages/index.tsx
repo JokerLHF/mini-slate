@@ -85,7 +85,9 @@ const HomePage = () => {
 
   const handleRemoveMark = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
-    Editor.removeMark(editor, 'bold')
+    const marks = Editor.marks(editor);
+    console.log('marks', marks);
+    Editor.removeMark(editor, 'bold');
   }, [editor]);
 
   return (
