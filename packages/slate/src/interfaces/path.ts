@@ -162,9 +162,9 @@ export const Path: PathInterface = {
    * 返回 [1], [1, 2]
    */
   ancestors(path: Path): Path[] {
-    let paths = Path.levels(path)
-    paths = paths.slice(0, -1)
-    return paths
+    let paths = Path.levels(path);
+    paths = paths.slice(0, -1);
+    return paths;
   },
 
   /**

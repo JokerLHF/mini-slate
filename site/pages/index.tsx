@@ -83,12 +83,19 @@ const HomePage = () => {
     Transforms.insertText(editor, '测试的');
   }, [editor]);
 
+  const handleRemoveMark = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    Editor.removeMark(editor, 'bold')
+  }, [editor]);
+
   return (
     <Slate editor={editor} value={initialValue}>
       <div onMouseDown={handleMarkBold}>点我加粗</div>
       <div onMouseDown={handleMarkItalic}>点我斜体</div>
       <div onMouseDown={handleSplitNodes}>点我splitNodes</div>
       <div onMouseDown={handleInsertText}>点我 insertText</div>
+      <div onMouseDown={handleRemoveMark}>点我 removeMarks</div>
+
       <Editable
         renderLeaf={renderLeaf}
       />

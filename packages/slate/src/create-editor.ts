@@ -68,6 +68,22 @@ export const createEditor = (): Editor => {
       }
     },
 
+    removeMark: (key: string) => {
+      const selection = editor.selection;
+      if (!selection) {
+        return;
+      }
+      // 在某一处光标，直接设置全局 marks. 渲染层根据 mark 切为多个 decoration 做渲染
+      if (Range.isCollapsed(selection)) {
+        const marks = editor.marks || {};
+        delete marks[key];
+        editor.marks = marks;
+        editor.onChange();
+      } else {
+        Transforms.setNodes(editor, { [key]: null });
+      }
+    },
+
     apply: (op: Operation) => {
       for (const pointRef of Editor.pointRefs(editor)) {
         PointRef.transform(pointRef, op);
@@ -132,6 +148,7 @@ export const createEditor = (): Editor => {
     /**
      * 什么才能算脏路径？
      * 可以想象文档是一个immer，对于某一处的修改会影响到的路径就是脏路径
+     * https://ithelp.ithome.com.tw/articles/10280025
      */
     getDirtyPaths(op: Operation) {
       switch(op.type) {
@@ -148,8 +165,12 @@ export const createEditor = (): Editor => {
           return Path.levels(path);
         }
         case 'insert_node': {
-          const { path } = op;
-          return Path.levels(path);
+          const { node, path } = op;
+          const levels = Path.levels(path);
+          const descendants = Text.isText(node)
+            ? []
+            : Array.from(Node.nodes(node), ([, p]) => path.concat(p));
+          return [...levels, ...descendants];
         }
         // merge 是往前 merge
         case 'merge_node': {
@@ -161,6 +182,35 @@ export const createEditor = (): Editor => {
         case 'remove_node': {
           const { path } = op;
           return Path.ancestors(path);
+        }
+        case 'move_node': {
+          const { path, newPath } = op;
+          if (Path.equals(path, newPath)) {
+            return [];
+          }
+
+          const oldAncestors: Path[] = [];
+          const newAncestors: Path[] = [];
+
+          // 因为移动可能对 path 有影响，所以需要 transform 
+          // path 的祖先
+          for (const ancestor of Path.ancestors(path)) {
+            const p = Path.transform(ancestor, op)
+            oldAncestors.push(p!)
+          }
+
+          // newPath 的祖先
+          for (const ancestor of Path.ancestors(newPath)) {
+            const p = Path.transform(ancestor, op)
+            newAncestors.push(p!)
+          }
+
+          // newPath 自己
+          const newParent = newAncestors[newAncestors.length - 1];
+          const newIndex = newPath[newPath.length - 1];
+          const resultPath = newParent.concat(newIndex);
+
+          return [...oldAncestors, ...newAncestors, resultPath];
         }
         default:
           return [];

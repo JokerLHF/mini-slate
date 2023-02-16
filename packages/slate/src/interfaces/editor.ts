@@ -98,6 +98,7 @@ export interface BaseEditor {
   deleteFragment: () => void;
 
   addMark: (key: string, value: any) => void;
+  removeMark: (key: string) => void;
 
   // Overrideable core actions.
   apply: (operation: Operation) => void;
@@ -135,6 +136,7 @@ export interface EditorInterface {
   ) => NodeEntry<Ancestor>;
   positions: (editor: Editor, operations?: EditorPositionsOptions) => Generator<Point, void, undefined>;
   addMark: (editor: Editor, key: string, value: any) => void;
+  removeMark: (editor: Editor, key: string) => void;
 
   insertText: (editor: Editor, text: string) => void;
   deleteBackward: (editor: Editor) => void;
@@ -202,6 +204,7 @@ export const Editor: EditorInterface = {
       && typeof value.getFragment === 'function'
       && typeof value.insertFragment === 'function'
       && typeof value.insertBreak === 'function'
+      && typeof value.removeMark === 'function'
       && (value.selection === null || Range.isRange(value.selection));
     return isEditor
   },
@@ -231,6 +234,10 @@ export const Editor: EditorInterface = {
 
   addMark(editor: Editor, key: string, value: any): void {
     editor.addMark(key, value)
+  },
+
+  removeMark(editor: Editor, key: string): void {
+    editor.removeMark(key)
   },
 
   /**
