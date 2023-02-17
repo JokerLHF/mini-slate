@@ -12,6 +12,8 @@ import { SelectionMode } from '../interfaces/types';
 interface SetNodeOptions<T extends Node> {
   at?: Location;
   match?: NodeMatch<T>;
+  split?: boolean;
+  mode?: SelectionMode;
 }
 
 interface SplitNodeOptions<T extends Node> {
@@ -192,12 +194,13 @@ export const NodeTransforms: NodeTransforms = {
     options: SetNodeOptions<T> = {},
   ) => {
     Editor.withoutNormalizing(editor, () => {
+      const { split = false,  mode = 'lowest', } = options;
       let { at = editor.selection, match } = options;
       if (!at) {
         return;
       }
 
-      if (Range.isRange(at)) {
+      if (split && Range.isRange(at)) {
         if (Range.isCollapsed(at)) {
           return;
         }
@@ -218,14 +221,24 @@ export const NodeTransforms: NodeTransforms = {
       }
 
       if (!match) {
-        match = n => Text.isText(n);
+        // path 等于自己
+        if (Path.isPath(at)) {
+          const [node] = Editor.node(editor, at);
+          match = n => n === node;
+        } else {
+          match = n => Element.isElement(n);
+        }
       }
 
       // 2. 对选区的节点增加 mark
-      for (const [node, nodePath] of Editor.nodes(editor, { at, match })) {
+      for (const [node, nodePath] of Editor.nodes(editor, { at, match, mode, })) {
         let hasChanges = false;
         const oldProperties = {};
         const newProperties = {};
+
+        if (!nodePath.length) {
+          continue;
+        }
 
         for (const k in props) {
           if (k === 'children' || k === 'text') {

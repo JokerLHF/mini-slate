@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@emotion/css": "^11.10.6",
     "slate": "workspace:^1.0.0",
     "slate-history": "workspace:^1.0.0",
     "slate-react": "workspace:^1.0.0"

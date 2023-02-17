@@ -169,7 +169,6 @@ export const TextTransforms: TextTransforms = {
         } else {
           const [_, end] = Range.edges(at);
           const pointRef = Editor.pointRef(editor, end);
-          // TODO: 这里的 selection 还有 bug
           Transforms.delete(editor, { at });
           at = pointRef.unref();
         }

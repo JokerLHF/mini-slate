@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo } from 'react'
-import { Editable, withReact, Slate, RenderLeafProps } from 'slate-react';
-import { createEditor, Editor, Descendant, Transforms } from 'slate';
+import { Editable, withReact, Slate, RenderLeafProps, useSlate } from 'slate-react';
+import { createEditor, Editor, Descendant, Transforms, Element as SlateElement } from 'slate';
 import { withHistory } from 'slate-history';
+
+import { Button, Icon, Toolbar } from '../components'
 
 const initialValue: Descendant[] = [
   {
@@ -19,21 +21,6 @@ const initialValue: Descendant[] = [
     ]
   },
 ]
-
-
-// const handleRenderElement = (props: RenderElementProps) => {
-//   const { attributes, children, element } = props
-//   switch (element.type) {
-//     case 'void':
-//       return <EditableVoid {...props} />
-//     case 'inline':
-//       return (
-//         <span {...attributes}>{children}</span>
-//       )
-//     default:
-//       return <div {...attributes}>{children}</div>
-//   }
-// }
 
 const Leaf = (props: RenderLeafProps) => {
   let { attributes, children, leaf } = props;
@@ -58,48 +45,170 @@ const Leaf = (props: RenderLeafProps) => {
 }
 
 
+const Element = ({ attributes, children, element }) => {
+  const style = { textAlign: element.align }  
+  switch (element.type) {
+    case 'block-quote':
+      return (
+        <blockquote style={style} {...attributes}>
+          {children}
+        </blockquote>
+      )
+    case 'bulleted-list':
+      return (
+        <ul style={style} {...attributes}>
+          {children}
+        </ul>
+      )
+    case 'heading-one':
+      return (
+        <h1 style={style} {...attributes}>
+          {children}
+        </h1>
+      )
+    case 'heading-two':
+      return (
+        <h2 style={style} {...attributes}>
+          {children}
+        </h2>
+      )
+    case 'list-item':
+      return (
+        <li style={style} {...attributes}>
+          {children}
+        </li>
+      )
+    case 'numbered-list':
+      return (
+        <ol style={style} {...attributes}>
+          {children}
+        </ol>
+      )
+    case 'div':
+      return (
+        <div>{children}</div>
+    )
+    default:
+      return (
+        <div style={style} {...attributes}>
+          {children}
+        </div>
+      )
+  }
+}
+
+const MarkButton = ({ format, icon}: { format: string, icon: string }) => {
+  const editor = useSlate();
+  return (
+    <Button
+      onMouseDown={event => {
+        event.preventDefault()
+        toggleMark(editor, format)
+      }}
+      active={isMarkActive(editor, format)}
+    >
+      <Icon>{icon}</Icon>
+    </Button>
+  )
+}
+
+const isMarkActive = (editor, format) => {
+  const marks = Editor.marks(editor)
+  return marks ? marks[format] === true : false
+}
+
+const toggleMark = (editor, format) => {
+  const isActive = isMarkActive(editor, format);  
+  if (isActive) {
+    Editor.removeMark(editor, format)
+  } else {
+    Editor.addMark(editor, format, true)
+  }
+}
+
+const BlockButton = ({ format, icon }) => {
+  const editor = useSlate()
+  return (
+    <Button
+      onMouseDown={event => {
+        event.preventDefault()
+        toggleBlock(editor, format)
+      }}
+      active={isBlockActive(
+        editor,
+        format,
+        TEXT_ALIGN_TYPES.includes(format) ? 'align' : 'type'
+      )}
+    >
+      <Icon>{icon}</Icon>
+    </Button>
+  )
+}
+
+const isBlockActive = (editor, format, blockType = 'type') => {
+  const { selection } = editor
+  if (!selection) return false
+
+  const [match] = Array.from(
+    Editor.nodes(editor, {
+      at: selection,
+      match: n =>
+        SlateElement.isElement(n) &&
+        n[blockType] === format,
+    })
+  )
+
+  return !!match;
+}
+
+const TEXT_ALIGN_TYPES = ['left', 'center', 'right', 'justify'];
+const toggleBlock = (editor, format) => {
+  const isActive = isBlockActive(
+    editor,
+    format,
+    TEXT_ALIGN_TYPES.includes(format) ? 'align' : 'type'
+  );
+
+  let newProperties = {};
+  if (TEXT_ALIGN_TYPES.includes(format)) {
+    newProperties = {
+      align: isActive ? undefined : format,
+    }
+  } else {
+    newProperties = {
+      type: isActive ? undefined : format,
+    }
+  }
+  Transforms.setNodes(editor, newProperties);
+}
+
+
 const HomePage = () => {
   const editor = useMemo(() => withHistory(withReact(createEditor())), []);
-  const renderLeaf = useCallback(props => <Leaf {...props} />, [])
-
-  const handleMarkBold = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    Editor.addMark(editor, 'bold', true);
-    // Transforms.setNodes(editor, { 'bold': true }, { at: [0, 1] });
-  }, [editor]);
-
-  const handleMarkItalic = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    Editor.addMark(editor, 'italic', true);
-  }, [editor]);
-
-  const handleSplitNodes = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    Transforms.splitNodes(editor);
-  }, [editor]);
-
-  const handleInsertText = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    Transforms.insertText(editor, '测试的');
-  }, [editor]);
-
-  const handleRemoveMark = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    const marks = Editor.marks(editor);
-    console.log('marks', marks);
-    Editor.removeMark(editor, 'bold');
-  }, [editor]);
+  const renderLeaf = useCallback(props => <Leaf {...props} />, []);
+  const renderElement = useCallback(props => <Element {...props} />, [])
 
   return (
     <Slate editor={editor} value={initialValue}>
-      <div onMouseDown={handleMarkBold}>点我加粗</div>
-      <div onMouseDown={handleMarkItalic}>点我斜体</div>
-      <div onMouseDown={handleSplitNodes}>点我splitNodes</div>
-      <div onMouseDown={handleInsertText}>点我 insertText</div>
-      <div onMouseDown={handleRemoveMark}>点我 removeMarks</div>
+      <Toolbar>
+        <MarkButton format="bold" icon="format_bold" />
+        <MarkButton format="italic" icon="format_italic" />
+        <MarkButton format="underline" icon="format_underlined" />
+        <MarkButton format="code" icon="code" />
+        <BlockButton format="heading-one" icon="looks_one" />
+        <BlockButton format="heading-two" icon="looks_two" />
+        <BlockButton format="block-quote" icon="format_quote" />
+        <BlockButton format="numbered-list" icon="format_list_numbered" />
+        <BlockButton format="bulleted-list" icon="format_list_bulleted" />
+        <BlockButton format="left" icon="format_align_left" />
+        <BlockButton format="center" icon="format_align_center" />
+        <BlockButton format="right" icon="format_align_right" />
+        <BlockButton format="justify" icon="format_align_justify" />
+      </Toolbar>
 
       <Editable
         renderLeaf={renderLeaf}
+        renderElement={renderElement}
       />
     </Slate>
   )

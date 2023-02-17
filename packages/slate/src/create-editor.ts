@@ -64,7 +64,7 @@ export const createEditor = (): Editor => {
         editor.marks = { [key]: value };
         editor.onChange();
       } else {
-        Transforms.setNodes(editor, { [key]: value });
+        Transforms.setNodes(editor, { [key]: value }, { match: Text.isText, split: true });
       }
     },
 
@@ -80,7 +80,7 @@ export const createEditor = (): Editor => {
         editor.marks = marks;
         editor.onChange();
       } else {
-        Transforms.setNodes(editor, { [key]: null });
+        Transforms.setNodes(editor, { [key]: null }, { match: Text.isText, split: true  });
       }
     },
 
@@ -271,8 +271,6 @@ export const createEditor = (): Editor => {
             });
             n--;
           }
-        } else if (Element.isElement(child)) {
-          // TODO
         }
       }
     },
