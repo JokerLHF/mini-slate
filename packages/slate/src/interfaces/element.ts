@@ -1,4 +1,4 @@
-import { Descendant } from "./node";
+import { Ancestor, Descendant } from "./node";
 import { isPlainObject } from 'is-plain-object';
 import { Node } from './node';
 import { Editor } from "./editor";
@@ -15,7 +15,8 @@ export type Element = ExtendedType<BaseElement>;
  */
 
 export interface ElementInterface {
-  isElement: (value: any) => value is Element
+  isElement: (value: any) => value is Element;
+  isAncestor: (value: any) => value is Ancestor;
 }
 
 export const Element: ElementInterface = {
@@ -25,7 +26,10 @@ export const Element: ElementInterface = {
       && Node.isNodeList(value.children)
       && !Editor.isEditor(value)
     )
-  }
+  },
+  isAncestor(value: any): value is Ancestor {
+    return isPlainObject(value) && Node.isNodeList(value.children)
+  },
 }
 
 

@@ -43,6 +43,26 @@ interface MoveNodesOptions<T extends Node> {
   to: Path;
 }
 
+interface WrapNodesOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+  split?: boolean;
+}
+
+interface unWrapNodesOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+  split?: boolean;
+}
+
+interface liftNodesOptions<T extends Node> {
+  at?: Location;
+  match?: NodeMatch<T>;
+  mode?: SelectionMode;
+}
+
 export interface NodeTransforms {
   insertNodes: (editor: Editor, nodes: Node | Node[], options?: { select?: boolean; at?: Location }) => void;
   splitNodes: <T extends Node>(editor: Editor, options?: SplitNodeOptions<T>) => void;
@@ -50,6 +70,9 @@ export interface NodeTransforms {
   mergeNodes: <T extends Node>(editor: Editor, options?: MergeNodeOptions<T>) => void;
   removeNodes: <T extends Node>(editor: Editor, options?: RemoveNodesOptions<T>) => void;
   moveNodes: <T extends Node>(editor: Editor, options: MoveNodesOptions<T>) => void;
+  wrapNodes: <T extends Node>(editor: Editor, element: Element, options?: WrapNodesOptions<T>) => void;  
+  unwrapNodes: <T extends Node>(editor: Editor, options?: unWrapNodesOptions<T>) => void;
+  liftNodes: <T extends Node>(editor: Editor, options?: liftNodesOptions<T>) => void
 }
 
 export const NodeTransforms: NodeTransforms = {
@@ -58,7 +81,7 @@ export const NodeTransforms: NodeTransforms = {
     options: SplitNodeOptions<T> = {}
   ) => {
     Editor.withoutNormalizing(editor, () => {
-      const {  mode = 'lowest' } = options;
+      const { mode = 'lowest' } = options;
       let { at = editor.selection, match, always = false } = options;
       let depth = 0;
 
@@ -122,7 +145,7 @@ export const NodeTransforms: NodeTransforms = {
     options?: { select?: boolean; at?: Location }
   ) => {
     Editor.withoutNormalizing(editor, () => {
-      let { select = true, at = editor.selection} = options || {};
+      let { select = false, at = editor.selection} = options || {};
       if (Node.isNode(nodes)) {
         nodes = [nodes]
       }
@@ -289,8 +312,9 @@ export const NodeTransforms: NodeTransforms = {
       if (!match) {
         // path 默认的 previous 需要有同一个 parent
         if (Path.isPath(at)) {
-          const [parent] = Editor.parent(editor, at)
-          match = n => parent.children.includes(n)
+          const [parent] = Editor.parent(editor, at);
+          // TODO: 使用 includes jest运行会报错...
+          match = n => parent.children.indexOf(n) !== -1;
         } else {
           match = (node) => Element.isElement(node)
         }
@@ -394,45 +418,223 @@ export const NodeTransforms: NodeTransforms = {
     editor: Editor,
     options: MoveNodesOptions<T>,
   ) => {
-    const {
-      mode = 'lowest',
-      at = editor.selection,
-      to,
-    } = options;
-
-    let { match } = options;
-    if (!at) {
-      return;
-    }
-
-    if (!match) {
-      // 如果是 path 默认从 at 开始移动
-      if (Path.isPath(at)) {
-        const node = Node.get(editor, at);
-        match = (n) => n === node;
-      } else {
-        // 如果是 range 或者 point，只要是 element（非editor）就可以移动
-        match = (n) => Element.isElement(n);
+    Editor.withoutNormalizing(editor, () => {
+      const {
+        mode = 'lowest',
+        at = editor.selection,
+        to,
+      } = options;
+  
+      let { match } = options;
+      if (!at) {
+        return;
       }
-    }
-
-    const toRef = Editor.pathRef(editor, to);
-    const nodeEntrys = Editor.nodes(editor, { mode, at, match });
-    const pathRefs = Array.from(nodeEntrys, ([_, p]) => Editor.pathRef(editor, p));
-
-    for (const pathRef of  pathRefs) {
-      const path = pathRef.unref();
-      const newPath = toRef.current;
-      // path.length === 0 为 editor
-      if (!path || !newPath || !path.length || !newPath.length) {
-        continue;
+  
+      if (!match) {
+        // 如果是 path 默认从 at 开始移动
+        if (Path.isPath(at)) {
+          const node = Node.get(editor, at);
+          match = (n) => n === node;
+        } else {
+          // 如果是 range 或者 point，只要是 element（非editor）就可以移动
+          match = (n) => Element.isElement(n);
+        }
       }
-      editor.apply({ type: 'move_node', path, newPath });
-      toRef.current = Path.next(newPath);
-    }
+  
+      const toRef = Editor.pathRef(editor, to);
+      const nodeEntrys = Editor.nodes(editor, { mode, at, match });
+      const pathRefs = Array.from(nodeEntrys, ([_, p]) => Editor.pathRef(editor, p));
+  
+      for (const pathRef of  pathRefs) {
+        const path = pathRef.unref();
+        const newPath = toRef.current;
+        // path.length === 0 为 editor
+        if (!path || !newPath || !path.length || !newPath.length) {
+          continue;
+        }
+        editor.apply({ type: 'move_node', path, newPath });
 
-    toRef.unref();
+        if (toRef.current) {
+          // 注意这里需要不能直接使用 Path.next(newPath), 因为上面 move_node 之后 newPath 有可能会改变，所以使用 ref 才能拿到正确的数据
+          toRef.current = Path.next(toRef.current);
+        }
+      }
+  
+      toRef.unref();
+    });
   },
+
+  /**
+   * 通过 mode, at, match 找到匹配的节点，
+   *  使用 element 节点包裹这些节点
+   */
+  wrapNodes: <T extends Node>(
+    editor: Editor,
+    element: Element,
+    options: WrapNodesOptions<T> = {},
+  ) => {
+    Editor.withoutNormalizing(editor, () => {
+      const { mode = 'lowest', at = editor.selection, split = false } = options;
+      let { match, } = options;
+  
+      if (!at) {
+        return;
+      }
+  
+      if (!match) {
+        if (Path.isPath(at)) {
+          const [node] = Editor.node(editor, at);
+          match = n => n === node;
+        } else {
+          match = n => Element.isElement(n);
+        }
+      }
+  
+      if (split && Range.isRange(at)) {
+        // splitNode 处理 range 类型是直接删除 range，所以这里需要分开 split
+        const [start, end] = Range.edges(at);
+        Transforms.splitNodes(editor, { at: start, match, mode });
+        Transforms.splitNodes(editor, { at: end, match, mode });
+      }
+  
+      // 1. 找到开始节点，结束节点
+      const matches = Array.from(Editor.nodes(editor, { at, match, mode }));
+      if (!matches.length) {
+        return;
+      }
+      const [, firstPath] = matches[0];
+      const [, lastPath] = matches[matches.length - 1];
+  
+      /**
+       * 2. 找到公共父节点，注意不能直接使用 common，
+       *    因为对于 firstPath:[0,0], lastPath:[0,0] 来说 common 就是[0,0]
+       *    但是希望拿到的是 [0]
+       */
+      const commonPath = Path.equals(firstPath, lastPath)
+        ? Path.parent(firstPath)
+        : Path.common(firstPath, lastPath)
+      const commonNodeEntry = Editor.node(editor, commonPath);
+      const [commonNode] = commonNodeEntry;
+      
+      // 3. 确认需要移动的范围。比如： 1｜2 即使光标没有覆盖到1，但是是以
+      const range = Editor.range(editor, firstPath, lastPath);
+  
+      // 4. 在公共父节点插入一个子节点，位置在 lastPath 那条路径右边
+      const depth = commonPath.length + 1;
+      const wrapperPath = Path.next(lastPath.slice(0, depth));
+      const wrapper = { ...element, children: [] };
+      Transforms.insertNodes(editor, wrapper, { at: wrapperPath });
+  
+      // 5. 将 range 范围内的节点都移动到 wrapper 中
+      Transforms.moveNodes(editor, {
+        at: range,
+        to: wrapperPath.concat(0),
+        match: n => {
+          // commonNode 是父节点 & n 是 commonNode 的子节点。 只需要将 at 范围内的子节点移动到 wrapper 节点即可
+          // TODO: 使用 includes jest运行会报错...
+          return  Element.isAncestor(commonNode) && commonNode.children.indexOf(n) !== -1;
+        },
+      });
+    });
+  },
+
+  /**
+   * 通过 mode, at, match 找到匹配的节点，
+   * 将其上升一个层级
+   */
+  liftNodes: <T extends Node>(
+    editor: Editor,
+    options: liftNodesOptions<T> = {},
+  ) => {
+    Editor.withoutNormalizing(editor, () => {
+      const { mode = 'lowest', at = editor.selection } = options;
+      let { match, } = options;
+  
+      if (!at) {
+        return;
+      }
+  
+      if (!match) {
+        if (Path.isPath(at)) {
+          const [node] = Editor.node(editor, at);
+          match = n => n === node;
+        } else {
+          match = n => Element.isElement(n);
+        }
+      }
+
+      const matchs = Editor.nodes(editor, { mode, at, match });
+      const pathRefs = Array.from(matchs, ([, p]) => Editor.pathRef(editor, p));
+      for (const pathRef of pathRefs) {
+        const path = pathRef.current!;
+        if (path.length < 2) {
+          throw new Error('第一层第二层节点没办法上升了');
+        }
+        const parentPath = Path.parent(path);
+        const [parentNode] = Editor.node(editor, parentPath);
+        const length = parentNode.children.length;
+        const index = path[path.length - 1];
+
+        if (length === 1) {
+          const parentNext = Path.next(parentPath);
+          Transforms.moveNodes(editor, { at: path, to: parentNext });
+          Transforms.removeNodes(editor, { at: parentPath });
+        } else if (index === 0) {
+          Transforms.moveNodes(editor, { at: path, to: parentPath });
+        } else if (index === length - 1) {
+          const parentNext = Path.next(parentPath);
+          Transforms.moveNodes(editor, { at: path, to: parentNext });
+        } else {
+          const pathNext = Path.next(path);
+          Transforms.splitNodes(editor, { at: pathNext });
+          const parentNext = Path.next(parentPath);
+          Transforms.moveNodes(editor, { at: path, to: parentNext });
+        }
+      }
+    });
+  },
+
+  // 找到匹配的父节点们，将其子节点上升一层
+  unwrapNodes: <T extends Node>(
+    editor: Editor,
+    options: unWrapNodesOptions<T> = {},
+  ) => {
+    Editor.withoutNormalizing(editor, () => {
+      let { at = editor.selection, match } = options;
+      const { mode = 'lowest' } = options;
+      if (!at) {
+        return;
+      }
+  
+      if (!match) {
+        if (Path.isPath(at)) {
+          const [node] = Editor.node(editor, at);
+          match = n => n === node;
+        } else {
+          match = n => Element.isElement(n);
+        }
+      }
+      
+      // 1. 找到匹配的父节点们
+      const matchs = Editor.nodes(editor, { at, match, mode });
+      const pathRefs = Array.from(matchs, ([, p]) => Editor.pathRef(editor, p));
+
+      for (const pathRef of pathRefs) {
+        const path = pathRef.current!;
+        const [node] = Editor.node(editor, path);
+        
+        // 2. 上升子节点
+        Transforms.liftNodes(editor, {
+          at: path,
+          mode,
+          // 只有自己的子节点才能上升
+          match: n => {
+            return Element.isAncestor(n) && node.children.indexOf(n) !== -1;
+          }
+        })
+      }
+    });
+  }
 }
 
 const hasSingleChildNest = (editor: Editor, node: Node): boolean => {

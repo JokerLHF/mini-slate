@@ -369,7 +369,7 @@ export const Path: PathInterface = {
           if (Path.isAncestor(path, p) || Path.equals(path, p)) {
             const copyPath = newPath.slice();
             // 删除了一个节点，需要改变位置
-            if (Path.endsBefore(path, p)) {
+            if (Path.endsBefore(path, newPath) && path.length < newPath.length) {
               copyPath[path.length - 1] -= 1;
             }
             // 公共父节点 + 原来其子节点的位置

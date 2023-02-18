@@ -1,4 +1,4 @@
-import { Editor } from "./interfaces/editor";
+import { Editor, root } from "./interfaces/editor";
 import { Element } from "./interfaces/element";
 import { Descendant, Node, NodeEntry } from "./interfaces/node";
 import { Operation } from "./interfaces/operation";
@@ -13,6 +13,7 @@ import { DIRTY_PATHS, DIRTY_PATHS_KEYS } from "./utils/weak-maps";
 
 export const createEditor = (): Editor => {
   const editor: Editor = {
+    root,
     children: [],
     selection: null,
     operations: [],
@@ -282,6 +283,10 @@ export const createEditor = (): Editor => {
 
     insertFragment: (data: Node[]) => {
       Transforms.insertFragment(editor, data);
+    },
+
+    insertNode: (node: Node) => {
+      Transforms.insertNodes(editor, node);
     },
   };
 

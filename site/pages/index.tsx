@@ -162,12 +162,22 @@ const isBlockActive = (editor, format, blockType = 'type') => {
 }
 
 const TEXT_ALIGN_TYPES = ['left', 'center', 'right', 'justify'];
+const LIST_TYPES = ['numbered-list', 'bulleted-list'];
+
 const toggleBlock = (editor, format) => {
   const isActive = isBlockActive(
     editor,
     format,
     TEXT_ALIGN_TYPES.includes(format) ? 'align' : 'type'
   );
+  const isList = LIST_TYPES.includes(format);
+
+  // 将 LIST_TYPES 节点的子节点展开（上升）
+  Transforms.unwrapNodes(editor, {
+    match: n => {
+      return SlateElement.isElement(n) && LIST_TYPES.includes(n.type) && !TEXT_ALIGN_TYPES.includes(format);
+    }
+  });
 
   let newProperties = {};
   if (TEXT_ALIGN_TYPES.includes(format)) {
@@ -176,10 +186,18 @@ const toggleBlock = (editor, format) => {
     }
   } else {
     newProperties = {
-      type: isActive ? undefined : format,
+      type: isActive ? undefined : isList ? 'list-item' : format,
     }
   }
   Transforms.setNodes(editor, newProperties);
+
+  // 创建一个 LIST_TYPES 节点，包括着 list-item
+  // list-item 渲染出 li
+  // LIST_TYPES 渲染出 ul/ol
+  if (!isActive && isList) {
+    const block = { type: format, children: [] };
+    Transforms.wrapNodes(editor, block);
+  }
 }
 
 

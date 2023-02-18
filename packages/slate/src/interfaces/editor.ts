@@ -85,6 +85,8 @@ export interface PathRefOptions {
  */
 
 export interface BaseEditor {
+  root: string;
+
   children: Descendant[];
   selection: Selection;
   operations: Operation[];
@@ -108,6 +110,7 @@ export interface BaseEditor {
   getFragment: () => Descendant[];
   insertFragment: (data: Node[]) => void;
   insertBreak: () => void;
+  insertNode: (node: Node) => void;
 }
 
 export type Editor = ExtendedType<BaseEditor>;
@@ -123,6 +126,7 @@ export interface EditorInterface {
     editor: Editor,
     options?: EditorNodesOptions<T>
   ) => Generator<NodeEntry<T>, void, undefined>;
+  insertNode: (editor: Editor, node: Node) => void;
 
   before: (editor: Editor, at: Location) => Point | undefined;
   previous: <T extends Node>(
@@ -189,26 +193,22 @@ export interface EditorInterface {
   insertBreak: (editor: Editor) => void;
 }
 
+export const root = `__SLATE__${Math.random()}`;
+
 export const Editor: EditorInterface = {
   isEditor(value: any) {
     if (!isPlainObject(value)) {
       return false
     }
-    // TODO: 其他情况的考虑
-    const isEditor = Node.isNodeList(value.children) 
-      && typeof value.addMark === 'function'
-      && typeof value.onChange === 'function'
-      && typeof value.apply === 'function'
-      && typeof value.isInline === 'function'
-      && typeof value.insertText === 'function'
-      && typeof value.getDirtyPaths === 'function'
-      && typeof value.normalizeNode === 'function'
-      && typeof value.getFragment === 'function'
-      && typeof value.insertFragment === 'function'
-      && typeof value.insertBreak === 'function'
-      && typeof value.removeMark === 'function'
-      && (value.selection === null || Range.isRange(value.selection));
-    return isEditor
+    /**
+     * slate 实现是判断 value 存在 BaseEditor 存在的属性和方法
+     * 但是不需要那么复杂，给一个标识就可。标识使用随机数，用户就不可能使用相同的标识混乱。
+     */
+    return value.root === root;
+  },
+
+  insertNode (editor: Editor, node: Node): void {
+    editor.insertNode(node)
   },
 
   insertBreak (editor: Editor) {
@@ -280,13 +280,14 @@ export const Editor: EditorInterface = {
   /**
    * 根据 location 中得到 textNode range
    */
-  range(editor: Editor, at: Location): Range {
-    if (Range.isRange(at)) {
+  range(editor: Editor, at: Location, to?: Location): Range {
+    if (Range.isRange(at) && !to) {
       return at;
     }
 
-    const start = Editor.point(editor, at, { edge: 'start' })
-    const end = Editor.point(editor, at, { edge: 'end' })
+    to = to || at;
+    const start = Editor.point(editor, at, { edge: 'start' });
+    const end = Editor.point(editor, to, { edge: 'end' });
     return { anchor: start, focus: end }
   },
   
@@ -609,8 +610,9 @@ export const Editor: EditorInterface = {
     // 2. match 默认是 true，path 是 parent.includes(p)
     if (!match) {
       if (Path.isPath(at)) {
-        const [parent] = Editor.parent(editor, at)
-        match = n => parent.children.includes(n)
+        const [parent] = Editor.parent(editor, at);
+        // TODO: 使用 includes jest运行会报错...
+        match = n => parent.children.indexOf(n) !== -1;
       } else {
         match = () => true;
       }
