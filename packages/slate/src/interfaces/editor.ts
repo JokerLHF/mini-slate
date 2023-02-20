@@ -382,8 +382,7 @@ export const Editor: EditorInterface = {
   /**
    * 根据 location 计算出 node 的范围， 
    * 根据 mode 模式，返回符合 match 的节点
-   * 
-   * 目前对这个 api 的使用理解上还不是很好，
+   * 即使 selection 是反向，默认也是正向返回。如果要反向返回，需要设置 reverse=true
    */
   *nodes<T extends Node>(
     editor: Editor,
@@ -456,26 +455,25 @@ export const Editor: EditorInterface = {
     
     const range = Editor.range(editor, at);
     const [start, end] = Range.edges(range);
-    const firstPath = reverse ? end.path : start.path;
-    const lastPath = reverse ? start.path : end.path;
 
-    for (const textEntry of Node.texts(editor, { 
-      from: firstPath,
-      to: lastPath,
+    for (const nodeEntry of Editor.nodes(editor, {
+      at: range,
+      match: Text.isText,
       reverse
     })) {
-      const [textNode, textNodePath] = textEntry;
-      const isFirst = Path.equals(textNodePath, firstPath)
-      const isEnd = Path.equals(textNodePath, lastPath)
+      const [textNode, textNodePath] = nodeEntry;
+      const isFirstNode = Path.equals(textNodePath, start.path);
+      const isEndNode = Path.equals(textNodePath, end.path);
+      const endOffset = isEndNode ? end.offset : textNode.text.length;
+      const startOffset = isFirstNode ? start.offset : 0;
 
       if (reverse) {
         let offset = textNode.text.length;
         while(true) {
-          if (isFirst && offset > end.offset) {
+          if (offset > endOffset) {
             offset--;
             continue;
           }
-          const startOffset = isEnd ? start.offset : 0;
           if (offset < startOffset) {
             break;
           }
@@ -488,12 +486,11 @@ export const Editor: EditorInterface = {
       let offset = 0;
       while(true) {
         // 在开始point之前不参与
-        if (isFirst && offset < start.offset) {
+        if (offset < startOffset) {
           offset++;
           continue;
         }
         // 在结束point之后表示
-        const endOffset = isEnd ? textNode.text.length - end.offset : textNode
         if (offset > endOffset) {
           break;
         }

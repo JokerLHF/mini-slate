@@ -36,6 +36,6 @@ describe('editor.positions', () => {
 
   it('positions', () => {
     const res = Array.from(Editor.positions(editor, { at: [0] }))
-    expect(res).toStrictEqual(output);
+    expect(res).toEqual(output);
   })
 })

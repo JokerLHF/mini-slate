@@ -414,6 +414,10 @@ export const NodeTransforms: NodeTransforms = {
     });
   },
 
+  /**
+   * 通过 at match mode 拿到需要移动的 nodes
+   * 将 nodes 移动到 toPath
+   */
   moveNodes: <T extends Node>(
     editor: Editor,
     options: MoveNodesOptions<T>,
@@ -453,11 +457,6 @@ export const NodeTransforms: NodeTransforms = {
           continue;
         }
         editor.apply({ type: 'move_node', path, newPath });
-
-        if (toRef.current) {
-          // 注意这里需要不能直接使用 Path.next(newPath), 因为上面 move_node 之后 newPath 有可能会改变，所以使用 ref 才能拿到正确的数据
-          toRef.current = Path.next(toRef.current);
-        }
       }
   
       toRef.unref();

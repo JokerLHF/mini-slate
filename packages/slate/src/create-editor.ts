@@ -196,8 +196,8 @@ export const createEditor = (): Editor => {
           // 因为移动可能对 path 有影响，所以需要 transform 
           // path 的祖先
           for (const ancestor of Path.ancestors(path)) {
-            const p = Path.transform(ancestor, op)
-            oldAncestors.push(p!)
+            const p = Path.transform(ancestor, op);
+            oldAncestors.push(p!);
           }
 
           // newPath 的祖先
