@@ -33,7 +33,6 @@ describe('transfroms.moveNodes', () => {
     Transforms.moveNodes(editor, { at: [0, 0], to: [1, 0] })
     expect(editor.children).toStrictEqual(output);
     editor.selection = { anchor: { path: [1,0], offset: 2 }, focus: {path: [1,0], offset: 2 } };
-
   })
 })
 

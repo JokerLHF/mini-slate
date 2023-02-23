@@ -42,8 +42,9 @@ describe('transfroms.moveNodes', () => {
       match: n => SlateElement.isElement(n),
       to: [0],
     });
-    // TODO: 这里结果有问题
+
     expect(editor.children).toStrictEqual(output);
+    expect(editor.selection).toEqual({ anchor: { path: [0,0], offset: 0 }, focus: {path: [1,0], offset: 3 } });
   })
 })
 

@@ -5,7 +5,6 @@ import { Transforms } from "../../../../src/transforms";
 const output: Descendant[] = [
   {
     children: [
-      // 真正的测试用例是下面这个
       {
         children: [{ text: 'two' }],
       },

@@ -368,7 +368,8 @@ export const Path: PathInterface = {
            */
           if (Path.isAncestor(path, p) || Path.equals(path, p)) {
             const copyPath = newPath.slice();
-            // 删除了一个节点，需要改变位置
+            // 跨层级删除了一个节点，需要改变位置需要 -1
+            // 同层级只是移动
             if (Path.endsBefore(path, newPath) && path.length < newPath.length) {
               copyPath[path.length - 1] -= 1;
             }
@@ -376,9 +377,9 @@ export const Path: PathInterface = {
             return copyPath.concat(p.slice(path.length));
           } 
 
-          /**
-            * 2. 对 newPath自己/newPath右边节点/newPath子节点 的处理逻辑
-            * 跨层级会存在少或者增加节点，           
+           /**
+            * 2. 对 newPath自己/newPath子节点 的处理逻辑
+            * 2.1 跨层级会存在少或者增加节点，           
             *    原来 op 同个父节点的 tree 就会少一个节点
             *    原来 onp 同个父节点的 tree 就会多一个节点
             * [0,0]
@@ -392,23 +393,41 @@ export const Path: PathInterface = {
             *   那么对于 [0，2，3] 来说应该变为 [0，1，3]，因为相当于前面少了一个节点，位置发生了变化
             *   对于[0,2,3] 应该变为[0,2,4], 因为相当于前面多了一个节点，位置发生变化
             * 最终 [0,2,3]应该就是 [0,1,4]
+            * 
+            * 2.2 同层级只是移动
            */
+          else if (Path.isAncestor(newPath, p) || Path.equals(newPath, p)) {
+            if (Path.isSibling(newPath, path)) {
+              if (Path.endsBefore(path, p)) {
+                p[path.length - 1] -= 1
+              } else {
+                p[path.length - 1] += 1
+              }
+            } else {
+              if (Path.endsBefore(path, p)) {
+                p[path.length - 1] -= 1
+              }
+  
+              p[newPath.length - 1] += 1
+            }
+          } 
 
-          else if (
-            Path.endsBefore(newPath, p) ||
-            Path.equals(newPath, p) ||
-            Path.isAncestor(newPath, p)
-          ) {
+          /**
+           * 3. newPath右边的节点。因为节点移动在 newPath 的位置，相当于在 newPath 前面增加了一个节点。所以需要在 newPath.length - 1 位置 +1
+           *     p[path.length - 1] -= 1 相当于 path 前面少了一个，所以需要 -1，
+           */
+          else if (Path.endsBefore(newPath, p)) {
             if (Path.endsBefore(path, p)) {
               p[path.length - 1] -= 1
             }
 
             p[newPath.length - 1] += 1
           } 
-
-          // 3. 对 path 右边节点的处理逻辑
+          /**
+           * 4. path 右边的节点
+           */
           else if (Path.endsBefore(path, p)) {
-            p[path.length - 1] -= 1
+            p[path.length - 1] -= 1;
           }
 
           break;

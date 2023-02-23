@@ -42,8 +42,7 @@ describe('transfroms.moveNodes', () => {
       to: [2],
     });
     expect(editor.children).toStrictEqual(output);
-    // TODO: 这里选区还有点问题，出来的结果是 { anchor: { path: [0,0], offset: 3 }, focus: {path: [2,0], offset: 3 } }
-    // expect(editor.selection).toStrictEqual({ anchor: { path: [1,0], offset: 3 }, focus: {path: [2,0], offset: 5 } });
+    expect(editor.selection).toStrictEqual({ anchor: { path: [1,0], offset: 3 }, focus: {path: [2,0], offset: 3 } });
   })
 })
 

@@ -457,6 +457,17 @@ export const NodeTransforms: NodeTransforms = {
           continue;
         }
         editor.apply({ type: 'move_node', path, newPath });
+
+        /**
+         * 同层级的移动。 newPath 需要再往前
+         */
+        if (
+          toRef.current &&
+          Path.isSibling(newPath, path) &&
+          Path.isAfter(newPath, path)
+        ) {
+          toRef.current = Path.next(toRef.current)
+        }
       }
   
       toRef.unref();
