@@ -162,6 +162,8 @@ export interface EditorInterface {
   isEdge: (editor: Editor, point: Point, at: Location) => boolean;
   isEnd: (editor: Editor, point: Point, at: Location) => boolean;
   isStart: (editor: Editor, point: Point, at: Location) => boolean;
+  start: (editor: Editor, at: Location) => Point;
+  end: (editor: Editor, at: Location) => Point;
 
   pointRef: (
     editor: Editor,
@@ -191,6 +193,7 @@ export interface EditorInterface {
   normalize: (editor: Editor) => void;
 
   insertBreak: (editor: Editor) => void;
+  isEmpty: (editor: Editor, element: Element) => boolean;
 }
 
 export const root = `__SLATE__${Math.random()}`;
@@ -207,6 +210,17 @@ export const Editor: EditorInterface = {
     return value.root === root;
   },
 
+  /**
+   * 判断是否是空节点
+   */
+  isEmpty(editor: Editor, element: Element): boolean {
+    const { children } = element;
+    const [first] = children;
+    const isNodeChildren = children.length === 0;
+    const hasEmptyTextChildren = children.length === 1 && Text.isText(first) && first.text === '';
+    return isNodeChildren || hasEmptyTextChildren;
+  },
+
   insertNode (editor: Editor, node: Node): void {
     editor.insertNode(node)
   },
@@ -219,13 +233,27 @@ export const Editor: EditorInterface = {
     return Editor.getDirtyPaths(op);
   },
 
+  /**
+   * Get the start point of a location.
+   */
+  end(editor: Editor, at: Location): Point {
+    return Editor.point(editor, at, { edge: 'end' });
+  },
+
   isEnd (editor: Editor, point: Point, at: Location): boolean {
-    const end =  Editor.point(editor, at, { edge: 'end' });
+    const end = Editor.end(editor, point)
     return Point.equals(end, point);
   },
 
+  /**
+   * Get the start point of a location.
+   */
+  start(editor: Editor, at: Location): Point {
+    return Editor.point(editor, at, { edge: 'start' });
+  },
+
   isStart (editor: Editor, point: Point, at: Location): boolean {
-    const start =  Editor.point(editor, at, { edge: 'start' });
+    const start = Editor.start(editor, point);
     return Point.equals(start, point);
   },
 
@@ -286,8 +314,8 @@ export const Editor: EditorInterface = {
     }
 
     to = to || at;
-    const start = Editor.point(editor, at, { edge: 'start' });
-    const end = Editor.point(editor, to, { edge: 'end' });
+    const start = Editor.start(editor, at);
+    const end = Editor.end(editor, to);
     return { anchor: start, focus: end }
   },
   
@@ -507,9 +535,9 @@ export const Editor: EditorInterface = {
     const distance = 1;
     let d = 0;
     // 从 root 节点最左边的 textPoint
-    const anchor = Editor.point(editor, [], { edge: 'start' });
+    const anchor = Editor.start(editor, []);
     // 获取从 at 开始最左边的节点
-    const focus = Editor.point(editor, at, { edge: 'start' })
+    const focus = Editor.start(editor, at);
     const range = { anchor, focus };
     let target;
 
@@ -603,7 +631,7 @@ export const Editor: EditorInterface = {
     if (!beforePoint) {
       return;
     }
-    const start = Editor.point(editor, [], { edge: 'start' });
+    const start =  Editor.start(editor, []);
     // 2. match 默认是 true，path 是 parent.includes(p)
     if (!match) {
       if (Path.isPath(at)) {

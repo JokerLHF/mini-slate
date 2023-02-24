@@ -167,7 +167,6 @@ export const Editable = (props: EditableProps) => {
 
     const { inputType, data, dataTransfer } = event;
     event.preventDefault();
-    console.log('onBeforeInput', event);
 
     const { selection } = editor;
     // 多选的删除

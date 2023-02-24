@@ -13,3 +13,12 @@ blockquote {
   color: #aaa;
   font-style: italic;
 }
+
+table {
+  border-collapse: collapse;
+}
+
+td {
+  padding: 10px;
+  border: 2px solid #ddd;
+}

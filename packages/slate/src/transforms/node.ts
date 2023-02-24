@@ -105,7 +105,6 @@ export const NodeTransforms: NodeTransforms = {
           Transforms.delete(editor, { at });
           at = endRef.unref();          
         }
-        match = n => Text.isText(n)
       }
 
       if (!match) {
@@ -202,7 +201,7 @@ export const NodeTransforms: NodeTransforms = {
       // 3. 光标选中到插入的节点
       at = Path.previous(at);
       if (select) {
-        const point = Editor.point(editor, at, { edge: 'end' });
+        const point = Editor.end(editor, at);
         Transforms.select(editor, point);
       }
     });
@@ -364,11 +363,18 @@ export const NodeTransforms: NodeTransforms = {
         throw new Error('mergeNodes 前后节点不一致')
       }
       // 4. 计算 position 和 path
-      editor.apply({
-        type: 'merge_node',
-        path: Path.next(prevPath),
-        position,
-      });
+      if (
+        // 前面节点是空节点，不能合并直接删除掉
+        (Element.isElement(prevNode) && Editor.isEmpty(editor, prevNode))
+      ) {
+        Transforms.removeNodes(editor, { at: prevPath,  })
+      } else {
+        editor.apply({
+          type: 'merge_node',
+          path: Path.next(prevPath),
+          position,
+        });
+      }
     });
   },
 

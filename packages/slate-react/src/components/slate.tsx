@@ -21,12 +21,13 @@ export const Slate = (props: {
       v: prev.v + 1,
       editor,
     }));
+    onChange?.(editor.children);
   }, []);
 
   useEffect(() => {
     EDITOR_TO_ON_CHANGE.set(editor, onContextChange);
     return () => {
-      EDITOR_TO_ON_CHANGE.set(editor, () => {})
+      EDITOR_TO_ON_CHANGE.set(editor, () => {});
     }
   }, []);
 

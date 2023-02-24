@@ -6,7 +6,6 @@ import { Node, NodeEntry } from "../interfaces/node";
 import { Path } from "../interfaces/path";
 import { Point } from "../interfaces/point";
 import { Range } from "../interfaces/range";
-import { RangeRef } from "../interfaces/range-ref";
 import { Text } from "../interfaces/text";
 
 export interface TextDeleteOptions {
@@ -84,7 +83,7 @@ export const TextTransforms: TextTransforms = {
       const matches: NodeEntry[] = [];
       let lastPath: Path | undefined
 
-      for (const nodeEntry of Node.nodes(editor, { from: start.path, to: end.path })) {
+      for (const nodeEntry of Editor.nodes(editor, { at: range })) {
         const [_, path] = nodeEntry;
         
         // Node.nodes是深度遍历，也就是 parent 会被先执行。如果 parent 被 matches 了， lastPath = parentPath
@@ -137,6 +136,7 @@ export const TextTransforms: TextTransforms = {
         text,
       });
 
+      // 存在尾部节点&开始节点，合并
       if (
         !isSingleText &&
         endRef.current &&
@@ -174,7 +174,7 @@ export const TextTransforms: TextTransforms = {
         }
       }
       if (Path.isPath(at)) {
-        at = Editor.point(editor, at, { edge: 'end' });
+        at = Editor.end(editor, at);
       }
       if (!at) {
         return;
