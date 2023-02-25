@@ -3,15 +3,73 @@ import { Editor } from "../interfaces/editor";
 import { Location } from '../interfaces/location';
 import { Point } from "../interfaces/point";
 import { Range } from '../interfaces/range';
+import { SelectionEdge } from "../interfaces/types";
+
+export interface SelectionMoveOptions {
+  reverse?: boolean;
+  edge?: SelectionEdge;
+  distance?: number;
+}
 
 export interface SelectionTransforms {
-  select: (editor: Editor, target: Location) => void,
-  deselect: (editor: Editor) => void,
-  setSelection: (editor: Editor, props: Partial<Range>) => void
+  select: (editor: Editor, target: Location) => void;
+  deselect: (editor: Editor) => void;
+  setSelection: (editor: Editor, props: Partial<Range>) => void;
+  move: (editor: Editor, options?: SelectionMoveOptions) => void;
 }
 
 // eslint-disable-next-line no-redeclare
 export const SelectionTransforms: SelectionTransforms = {
+  /**
+   *  选区是正的: [anchor, focus]
+   *  选区是反的: [focus, anchor]
+   * start 表示如果选区是正的，就把 anchor 移动，如果选区是反的，就把 focus 移动的
+   * end 同上
+   * anchor: 就直接移动 anchor，
+   * focus: 就直接移动 focus
+   */
+  move(editor: Editor, options: SelectionMoveOptions = {}) {
+    const { selection } = editor;
+    const { distance = 1, reverse = false } = options
+    let { edge = null } = options
+
+    if (!selection) {
+      return;
+    }
+
+    const props: Partial<Range> = {};
+
+    if (edge === 'start') {
+      edge = Range.isBackward(selection) ? 'focus' : 'anchor'
+    }
+
+    if (edge === 'end') {
+      edge = Range.isBackward(selection) ? 'anchor' : 'focus'
+    }
+
+    const { anchor, focus } = selection;
+    if (edge === null || edge === 'anchor') {
+      const point = reverse 
+        ? Editor.before(editor, anchor, { distance })
+        : Editor.after(editor, anchor, { distance });
+
+      if (point) {
+        props.anchor = point;
+      }
+    }
+
+    if (edge === null || edge === 'focus') {
+      const point = reverse
+        ? Editor.before(editor, focus, { distance })
+        : Editor.after(editor, focus, { distance });
+
+      if (point) {
+        props.focus = point;
+      }
+    }
+
+    Transforms.setSelection(editor, props);
+  },
   /**
    * 为 editor 设置 selection，
    */

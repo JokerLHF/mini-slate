@@ -1,7 +1,7 @@
 import { BaseEditor, Editor, Path, Node, Point, Range } from "slate";
 import { DOMNode, DOMRange, DOMSelection, DOMStaticRange, isDOMSelection, DOMPoint, isDOMElement, DOMElement } from "../utils/dom";
 import { Key } from "../utils/key";
-import { EDITOR_TO_ELEMENT, EDITOR_TO_KEY_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, NODE_TO_INDEX, NODE_TO_KEY, NODE_TO_PARENT } from "../utils/weak-map";
+import { EDITOR_TO_ELEMENT, EDITOR_TO_KEY_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, IS_FOCUSED, NODE_TO_INDEX, NODE_TO_KEY, NODE_TO_PARENT } from "../utils/weak-map";
 
 export interface ReactEditor extends BaseEditor {
   setFragmentData: (data: DataTransfer) => void;
@@ -10,6 +10,10 @@ export interface ReactEditor extends BaseEditor {
 
 // eslint-disable-next-line no-redeclare
 export const ReactEditor = {
+  isFocused(editor: ReactEditor): boolean {
+    return !!IS_FOCUSED.get(editor);
+  },
+
   findKey(editor: ReactEditor, node: Node) {
     let key = NODE_TO_KEY.get(node)
 

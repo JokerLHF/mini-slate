@@ -16,6 +16,7 @@ export type PointEntry = [Point, 'anchor' | 'focus'];
 export interface PointInterface {
   isPoint: (value: any) => value is Point,
   isAfter: (point: Point, another: Point) => boolean,
+  isBefore: (point: Point, another: Point) => boolean,
   compare: (point: Point, another: Point) => -1 | 0 | 1,
   equals: (point: Point, another: Point) => boolean,
   transform: (
@@ -38,6 +39,10 @@ export const Point: PointInterface = {
    */
   isAfter(point: Point, another: Point): boolean {
     return Point.compare(point, another) === 1;
+  },
+
+  isBefore(point: Point, another: Point): boolean {
+    return Point.compare(point, another) === -1;
   },
 
   /**

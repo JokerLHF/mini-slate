@@ -78,7 +78,19 @@ export const TextTransforms: TextTransforms = {
 
       const range = Editor.range(editor, at!);
       const [start, end] = Range.edges(range);
+      // 是否对同一个节点进行删除操作
       const isSingleText = Path.equals(start.path, end.path);
+
+      const startBlock = Editor.above(editor, {
+        match: n => Element.isElement(n) && Editor.isBlock(editor, n),
+        at: start,
+      });
+      const endBlock = Editor.above(editor, {
+        match: n => Element.isElement(n) && Editor.isBlock(editor, n),
+        at: end,
+      });
+      // 是否跨了不同 block（父节点不同）
+      const isAcrossBlocks = startBlock && endBlock && !Path.equals(startBlock[1], endBlock[1]);
 
       const matches: NodeEntry[] = [];
       let lastPath: Path | undefined
@@ -92,10 +104,9 @@ export const TextTransforms: TextTransforms = {
           continue;
         }
 
-        // 跟 start end 同个祖先不处理，等到下面的 apply 逻辑去处理
+        // 跟 start end 同个祖先不处理，因为只需要删除文本
         if (
-          !Path.isCommon(path, start.path) &&
-          !Path.isCommon(path, end.path)
+          (!Path.isCommon(path, start.path) && !Path.isCommon(path, end.path))
         ) {
           matches.push(nodeEntry);
           lastPath = path;
@@ -136,9 +147,10 @@ export const TextTransforms: TextTransforms = {
         text,
       });
 
-      // 存在尾部节点&开始节点，合并
+      // 存在尾部节点&开始节点，跨节点的操作。非跨节点的最后会经过 normalize 格式化
       if (
         !isSingleText &&
+        isAcrossBlocks &&
         endRef.current &&
         startRef.current
       ) {
@@ -183,7 +195,6 @@ export const TextTransforms: TextTransforms = {
       const blockMatch = Editor.above(editor, {
         match: n => Element.isElement(n),
         at,
-        reverse: true,
       })!;
       const [_, blockPath] = blockMatch;
       const isBlockStart = Editor.isStart(editor, at, blockPath);

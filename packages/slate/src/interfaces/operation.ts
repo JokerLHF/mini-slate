@@ -131,8 +131,31 @@ export const Operation: OperationInterface = {
        * 相反的话需要从 newPath 移动到 path
        */
       case 'move_node': {
-        const { path, newPath } = op;
-        return { ...op, path: newPath, newPath: path };
+        const { newPath, path } = op
+
+        // PERF: in this case the move operation is a no-op anyways.
+        if (Path.equals(newPath, path)) {
+          return op
+        }
+
+        // If the move happens completely within a single parent the path and
+        // newPath are stable with respect to each other.
+        if (Path.isSibling(path, newPath)) {
+          return { ...op, path: newPath, newPath: path }
+        }
+
+        /**
+         * 画图理解就很好理解了：
+         * 
+         * 假设 op 是从 [0,3] 移动过到 [0,4,0]，
+         *    在 generator 的时候是通过对 [0,3] 进行 transfrom 得到真正需要移动到的节点位置， 而不是直接用 [0,4,0]
+         *    这里也一样，需要对 path 进行 transform 得到之前 genarator 时原来移动到的位置，从这位置拿到节点
+         *    
+         *    因为非兄弟节点的移动，[0,3] 这条路径都会被移除。原来 [0,3] 后面的位置会被提前。也就是 Path.next(path) 相当于 [0,3] 的位置
+         */
+        const inversePath = Path.transform(path, op)!
+        const inverseNewPath = Path.transform(Path.next(path), op)!
+        return { ...op, path: inversePath, newPath: inverseNewPath }
       }
     }
   }

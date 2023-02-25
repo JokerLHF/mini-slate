@@ -4,7 +4,7 @@ import { Node } from './node';
 import { Operation } from "./operation";
 import { Range } from './range';
 import { Point } from './point';
-import { LeafEdge, RangeDirection, TextDirection } from "./types";
+import { LeafEdge, RangeDirection, RangeMode, TextDirection } from "./types";
 import { Path } from "./path";
 import { Location } from './location';
 import { Text } from "./text";
@@ -55,7 +55,7 @@ export interface EditorLevelsOptions<T extends Node> {
 export interface EditorAboveOptions<T extends Node> {
   at?: Location;
   match?: NodeMatch<T>;
-  reverse?: boolean;
+  mode?: RangeMode;
 }
 
 export interface EditorPreviousOptions<T extends Node> {
@@ -78,6 +78,14 @@ export interface RangeRefOptions {
 
 export interface PathRefOptions {
   affinity: TextDirection | null
+}
+
+export interface BeforeOptions {
+  distance?: number;
+}
+
+export interface AfterOptions {
+  distance?: number;
 }
 
 /**
@@ -128,7 +136,9 @@ export interface EditorInterface {
   ) => Generator<NodeEntry<T>, void, undefined>;
   insertNode: (editor: Editor, node: Node) => void;
 
-  before: (editor: Editor, at: Location) => Point | undefined;
+  before: (editor: Editor, at: Location, options?: BeforeOptions) => Point | undefined;
+  after(editor: Editor, at: Location, options?: AfterOptions): Point | undefined;
+
   previous: <T extends Node>(
     editor: Editor,
     options?: EditorPreviousOptions<T>
@@ -194,6 +204,8 @@ export interface EditorInterface {
 
   insertBreak: (editor: Editor) => void;
   isEmpty: (editor: Editor, element: Element) => boolean;
+  string: (editor: Editor, at: Location) => string;
+  isBlock: (editor: Editor, value: Element) => boolean;
 }
 
 export const root = `__SLATE__${Math.random()}`;
@@ -210,6 +222,9 @@ export const Editor: EditorInterface = {
     return value.root === root;
   },
 
+  isBlock(editor: Editor, value: Element): boolean {
+    return !editor.isInline(value)
+  },
   /**
    * 判断是否是空节点
    */
@@ -240,8 +255,9 @@ export const Editor: EditorInterface = {
     return Editor.point(editor, at, { edge: 'end' });
   },
 
+  // point 是否是 at 区域的 end
   isEnd (editor: Editor, point: Point, at: Location): boolean {
-    const end = Editor.end(editor, point)
+    const end = Editor.end(editor, at);
     return Point.equals(end, point);
   },
 
@@ -252,9 +268,15 @@ export const Editor: EditorInterface = {
     return Editor.point(editor, at, { edge: 'start' });
   },
 
-  isStart (editor: Editor, point: Point, at: Location): boolean {
-    const start = Editor.start(editor, point);
-    return Point.equals(start, point);
+  // point 是否是 at 区域的 start
+  isStart(editor: Editor, point: Point, at: Location): boolean {
+    // PERF: If the offset isn't `0` we know it's not the start.
+    if (point.offset !== 0) {
+      return false
+    }
+
+    const start = Editor.start(editor, at)
+    return Point.equals(point, start)
   },
 
   // point is edge in at
@@ -531,8 +553,8 @@ export const Editor: EditorInterface = {
   /**
    * 根据 location 返回上一步 point
    */
-  before(editor: Editor, at: Location): Point | undefined {
-    const distance = 1;
+  before(editor: Editor, at: Location, options: BeforeOptions = {}): Point | undefined {
+    const { distance = 1 } = options;
     let d = 0;
     // 从 root 节点最左边的 textPoint
     const anchor = Editor.start(editor, []);
@@ -559,6 +581,54 @@ export const Editor: EditorInterface = {
     return  target;
   },
 
+  /**
+   * 根据 location 返回后一步 point
+   */
+  after(editor: Editor, at: Location, options: AfterOptions = {}): Point | undefined {
+    const { distance = 1 } = options;
+    let d = 0;
+    // 从 root 节点最右边的 textPoint
+    const anchor = Editor.end(editor, at);
+    // 获取从 at 开始最左边的节点
+    const focus = Editor.end(editor, []);
+    const range = { anchor, focus };
+    let target;
+
+    for (const node of Editor.positions(editor, { 
+      at: range,
+    })) {
+      if (d > distance) {
+        break;
+      }
+
+      // 排除掉 at 自己
+      if (d !== 0) {
+        target = node;
+      }
+      d++;
+    }
+
+    return  target;
+  },
+
+  string(editor: Editor, at: Location) {
+    const range = Editor.range(editor, at);
+    const [start, end] = Range.edges(range);
+
+    let text = '';
+    for (const [textNode, textNodePath] of Editor.nodes(editor, { at: range, match: Text.isText })) {
+      if (Path.equals(start.path, textNodePath)) {
+        text += textNode.text.slice(start.offset);
+      } else if (Path.equals(end.path, textNodePath)) {
+        text += textNode.text.slice(end.offset);
+      } else {
+        text += textNode.text;
+      }
+    };
+
+    return text;
+  },
+
   insertText(editor: Editor, text: string) {
     editor.insertText(text);
   },
@@ -581,20 +651,24 @@ export const Editor: EditorInterface = {
 
   /**
    * 向上找到第一个 match 的节点（除了本身）,
-   *  默认是从 ediotr 到节点路径往下
-   *  reverse 则是从节点到 editor 往上
+   *  默认是从节点到 editor 往上
+   *  reverse 是从 editor 到节点
    */
   above<T extends Node>(
     editor: Editor,
-    options: EditorLevelsOptions<T> = {}
+    options: EditorAboveOptions<T> = {}
   ): NodeEntry<T> | undefined {
-    let { at = editor.selection } = options;
+    let { at = editor.selection,  match, mode = 'lowest' } = options;
     if (!at) {
       return;
     }
 
     const path = Editor.path(editor, at);
-    for (const nodeEntry of Editor.levels(editor, options)) {
+    for (const nodeEntry of Editor.levels(editor, {
+      at,
+      match,
+      reverse: mode === 'lowest',
+    })) {
       const [n, p] = nodeEntry;
       if (!Text.isText(n) && !Path.equals(p, path)) {
         return nodeEntry;

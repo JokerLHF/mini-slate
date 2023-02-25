@@ -4,14 +4,14 @@ import { useSlate } from '../hooks/use-slate';
 import { Element, Text, Transforms, Range, NodeEntry, Editor } from 'slate';
 import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect';
 import { ReactEditor } from '../plugin/react-editor';
-import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING } from '../utils/weak-map';
+import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING, IS_FOCUSED } from '../utils/weak-map';
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
 import HOT_KEYS from '../utils/hotkeys';
 
 export interface RenderElementProps {
-  children: any
-  element: Element,
+  children: any;
+  element: Element;
   attributes: {
     'data-slate-node': 'element',
     ref: (dom: HTMLElement | null) => void
@@ -19,17 +19,18 @@ export interface RenderElementProps {
 }
 
 export interface RenderLeafProps {
-  children: any
-  leaf: Text,
+  children: any;
+  leaf: Text;
   attributes: {
     'data-slate-leaf': true
   }
 }
 
 export type EditableProps = {
-  renderElement?: (props: RenderElementProps) => JSX.Element
-  renderLeaf?: (props: RenderLeafProps) => JSX.Element
-  decorate?: (entry: NodeEntry) => Range[]
+  renderElement?: (props: RenderElementProps) => JSX.Element;
+  renderLeaf?: (props: RenderLeafProps) => JSX.Element;
+  decorate?: (entry: NodeEntry) => Range[];
+  onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
 };
 
 const Children = (props: Parameters<typeof useChildren>[0]) => {
@@ -41,6 +42,7 @@ export const Editable = (props: EditableProps) => {
   const {
     renderElement,
     renderLeaf,
+    onKeyDown,
   } = props;
 
   const Component = 'div';
@@ -238,6 +240,10 @@ export const Editable = (props: EditableProps) => {
         Editor.insertText(editor, event.data);
       }, [editor])}
       onKeyDown={useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (onKeyDown) {
+          onKeyDown?.(event);
+          return;
+        }
         const { nativeEvent } = event;
         if (HOT_KEYS.isRedo(nativeEvent)) {
           console.log('HOT_KEYS-isRedo');
@@ -249,10 +255,16 @@ export const Editable = (props: EditableProps) => {
           (editor as any).undo && (editor as any).undo();
           return;
         }
-      }, [])}
+      }, [onKeyDown])}
       onCopy={useCallback((event: React.ClipboardEvent<HTMLDivElement>) => { // command+c
         event.preventDefault();
         ReactEditor.setFragmentData(editor, event.clipboardData);
+      }, [])}
+      onFocus={useCallback(() => {
+        IS_FOCUSED.set(editor, true);
+      }, [])}
+      onBlur={useCallback(() => {
+        IS_FOCUSED.set(editor, false);
       }, [])}
     >
       <Children
@@ -260,6 +272,7 @@ export const Editable = (props: EditableProps) => {
         renderElement={renderElement}
         renderLeaf={renderLeaf}
         decorations={decorations}
+        selection={selection}
       />
     </Component>
   )

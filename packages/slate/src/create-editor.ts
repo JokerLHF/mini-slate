@@ -230,6 +230,7 @@ export const createEditor = (): Editor => {
 
       /**
        * 规则1：所有 element 都至少保证一个 text 子节点
+       *       All Element nodes must contain at least one Text descendant 
        */
       if (Element.isElement(node) && node.children.length === 0) {
         const child = { text: '' };
@@ -249,28 +250,62 @@ export const createEditor = (): Editor => {
         const currentNode = Node.get(editor, path);
         const prev = currentNode.children[n - 1] as Descendant;
         const child = node.children[i];
-        /**
-         * 规则2: 合并空的或匹配的相邻文本节点。
-         */
-        if (Text.isText(child) && Text.isText(prev)) {
+        const isLast = i === node.children.length - 1;
+
+        if (Element.isElement(child)) {
           /**
-           * 规则2.1: 相邻且完全相同的 properties 的 Text 合并成一个节点
+           * 规则3: inlineBlock 不能作为第一个或者最后一个节点，前一个节点必须是文本节点（要不然前面没办法插入光标）
+           *       Inline nodes cannot be the first or last child of a parent block, nor can it be next to another inline node in the children array
            */
-          if (Text.equals(child, prev, { isEqualText: false })) {
-            Transforms.mergeNodes(editor, {
-              at: path.concat(n),
-              match: n => Text.isText(n)
-            });
-            n--;
+          if (editor.isInline(child)) {
+            /**
+             * 规则3.1    
+             *   prev === null 代表 inlineBlock 在第一个
+             *   Text.isText(prev) 代表前一个节点是文本节点（要不然前面没办法插入光标）
+             */
+            if (prev == null || !Text.isText(prev)) {
+              const newChild = { text: '' }
+              Transforms.insertNodes(editor, newChild, {
+                at: path.concat(n),
+              });
+              n++;
+            }
+            /**
+             * 规则3.2 inlineBlock 不能在最后一个节点
+             */
+            else if (isLast) {
+              const newChild = { text: '' }
+              Transforms.insertNodes(editor, newChild, {
+                at: path.concat(n + 1),
+              });
+              n++;
+            }
           }
+        } else {
           /**
-           * 规则2.2: 后一个节点时空直接删除
+           * 规则2: 合并空的或匹配的相邻文本节点。
+           *       Two adjacent texts with the same custom properties will be merged
            */
-          else if (child.text === '') {
-            Transforms.removeNodes(editor, {
-              at: path.concat(n)
-            });
-            n--;
+          if (Text.isText(prev)) {
+            /**
+             * 规则2.1: 相邻且完全相同的 properties 的 Text 合并成一个节点
+             */
+            if (Text.equals(child, prev, { isEqualText: false })) {
+              Transforms.mergeNodes(editor, {
+                at: path.concat(n),
+                match: n => Text.isText(n)
+              });
+              n--;
+            }
+            /**
+             * 规则2.2: 后一个节点时空直接删除
+             */
+            else if (child.text === '') {
+              Transforms.removeNodes(editor, {
+                at: path.concat(n)
+              });
+              n--;
+            }
           }
         }
       }

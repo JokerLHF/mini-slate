@@ -27,6 +27,7 @@ export interface RangeInterface {
   ) => Range | null;
   points: (range: Range) => Generator<PointEntry, void, undefined>;
   includes: (range: Range, target: Path) => boolean;
+  intersection: (range: Range, anchor: Range) => Range | null;
 }
 
 export const Range: RangeInterface = {
@@ -43,6 +44,21 @@ export const Range: RangeInterface = {
     );
   },
 
+  /**
+   * 获取一个范围与另一个范围的交集。
+   */
+  intersection(range: Range, another: Range): Range | null {
+    const [s1, e1] = Range.edges(range);
+    const [s2, e2] = Range.edges(another);
+    const start = Point.isBefore(s1, s2) ? s2 : s1;
+    const end = Point.isBefore(e1, e2) ? e1 : e2;
+
+    if (Point.isBefore(start, end)) {
+      return { anchor: start, focus: end };
+    }
+    return null;
+  },
+  
   /**
    * 按照它们在文档中的显示顺序，返回起点终点。
    *   - range 是从后到前 { anchor: 后, focus: 前 }，会返回【前，后】

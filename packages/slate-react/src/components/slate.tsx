@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect }  from "react"
+import React, { useCallback, useEffect, useState }  from "react"
 import { Descendant } from "slate"
+import { FocusedContext } from "../hooks/use-focused"
+import { useIsomorphicLayoutEffect } from "../hooks/use-isomorphic-layout-effect"
 import { SlateContext, SlateContextValue } from "../hooks/use-slate"
 import { ReactEditor } from "../plugin/react-editor"
 import { EDITOR_TO_ON_CHANGE } from "../utils/weak-map"
@@ -31,9 +33,30 @@ export const Slate = (props: {
     }
   }, []);
 
+  const [isFocus, setIsFocused] = useState(ReactEditor.isFocused(editor));
+
+  useEffect(() => {
+    setIsFocused(ReactEditor.isFocused(editor));
+  });
+
+  useIsomorphicLayoutEffect(() => {
+    const fn = () => {
+      setIsFocused(ReactEditor.isFocused(editor))
+    }
+    // Editable 的 onFocus 先执行后触发这里
+    document.addEventListener('focusin', fn)
+    document.addEventListener('focusout', fn)
+    return () => {
+      document.removeEventListener('focusin', fn)
+      document.removeEventListener('focusout', fn)
+    }
+  }, []);
+
   return (
     <SlateContext.Provider value={context}>
-      {children}
+      <FocusedContext.Provider value={isFocus}>
+        {children}
+      </FocusedContext.Provider>
     </SlateContext.Provider>
   );
 }

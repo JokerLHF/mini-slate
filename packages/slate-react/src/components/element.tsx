@@ -22,6 +22,7 @@ const Element = (props: {
   renderElement?: (props: RenderElementProps) => JSX.Element,
   renderLeaf?: (props: RenderLeafProps) => JSX.Element,
   decorations: Range[],
+  selection: Range | null
 }) => {
   const editor = useSlate();
   const {
@@ -29,6 +30,7 @@ const Element = (props: {
     renderElement = (p: RenderElementProps) => <DefaultElement {...p} />,
     renderLeaf,
     decorations,
+    selection,
   } = props;
 
   const key = ReactEditor.findKey(editor, element);
@@ -56,7 +58,7 @@ const Element = (props: {
     attributes['data-slate-inline'] = true
   }
   
-  let children: React.ReactNode = useChildren({ node: element, renderElement, renderLeaf, decorations })
+  let children: React.ReactNode = useChildren({ node: element, renderElement, renderLeaf, decorations, selection })
   
   return renderElement({ attributes, element, children });
 };

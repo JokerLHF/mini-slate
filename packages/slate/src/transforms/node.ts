@@ -50,29 +50,34 @@ interface WrapNodesOptions<T extends Node> {
   split?: boolean;
 }
 
-interface unWrapNodesOptions<T extends Node> {
+interface UnWrapNodesOptions<T extends Node> {
   at?: Location;
   match?: NodeMatch<T>;
   mode?: SelectionMode;
   split?: boolean;
 }
 
-interface liftNodesOptions<T extends Node> {
+interface LiftNodesOptions<T extends Node> {
   at?: Location;
   match?: NodeMatch<T>;
   mode?: SelectionMode;
 }
 
+interface InsertNodeOptions {
+  select?: boolean;
+  at?: Location;
+}
+
 export interface NodeTransforms {
-  insertNodes: (editor: Editor, nodes: Node | Node[], options?: { select?: boolean; at?: Location }) => void;
+  insertNodes: (editor: Editor, nodes: Node | Node[], options?: InsertNodeOptions) => void;
   splitNodes: <T extends Node>(editor: Editor, options?: SplitNodeOptions<T>) => void;
   setNodes: <T extends Node>(editor: Editor, props: Partial<Node>, options?: SetNodeOptions<T>) => void;
   mergeNodes: <T extends Node>(editor: Editor, options?: MergeNodeOptions<T>) => void;
   removeNodes: <T extends Node>(editor: Editor, options?: RemoveNodesOptions<T>) => void;
   moveNodes: <T extends Node>(editor: Editor, options: MoveNodesOptions<T>) => void;
   wrapNodes: <T extends Node>(editor: Editor, element: Element, options?: WrapNodesOptions<T>) => void;  
-  unwrapNodes: <T extends Node>(editor: Editor, options?: unWrapNodesOptions<T>) => void;
-  liftNodes: <T extends Node>(editor: Editor, options?: liftNodesOptions<T>) => void
+  unwrapNodes: <T extends Node>(editor: Editor, options?: UnWrapNodesOptions<T>) => void;
+  liftNodes: <T extends Node>(editor: Editor, options?: LiftNodesOptions<T>) => void
 }
 
 export const NodeTransforms: NodeTransforms = {
@@ -141,10 +146,10 @@ export const NodeTransforms: NodeTransforms = {
   insertNodes: (
     editor: Editor,
     nodes: Node | Node[],
-    options?: { select?: boolean; at?: Location }
+    options: InsertNodeOptions = {}
   ) => {
     Editor.withoutNormalizing(editor, () => {
-      let { select = false, at = editor.selection} = options || {};
+      let { select = false, at } = options;
       if (Node.isNode(nodes)) {
         nodes = [nodes]
       }
@@ -152,6 +157,20 @@ export const NodeTransforms: NodeTransforms = {
       if (!nodes.length) {
         return;
       }
+
+      /**
+       * 没有传入 at 默认使用 selection， 没有 selection 使用最右边的 point
+       */
+      if (!at) {
+        if (editor.selection) {
+          at = editor.selection
+        } else {
+          at = Editor.end(editor, [])
+        }
+
+        select = true
+      }
+
       /**
        * 1. 将 at 处理成 path
        */
@@ -181,9 +200,6 @@ export const NodeTransforms: NodeTransforms = {
       /**
        * 2. 将 node 插入到 at 的位置
        */
-      if (!at) {
-        return;
-      }
       const parentPath = Path.parent(at);
       let index = at[at.length - 1];
       for (const node of nodes) {
@@ -332,14 +348,15 @@ export const NodeTransforms: NodeTransforms = {
       // 3. 拿到同一个层级的数据，判断是否是同层级
       const isPreviousSibling = Path.isSibling(currentPath, prevPath)
       
-      // 4. 往上寻找空的父节点
+      // 4. 往上寻找空的父节点(从 editor 往下找)
       const commonPath = Path.common(currentPath, prevPath);
       const emptyAncestor = Editor.above(editor, {
         at: currentPath,
         // 到公共 path 就可以停止了
         match: (n, p) => {
           return Path.isAncestor(commonPath, p) && hasSingleChildNest(editor, n)
-        }
+        },
+        mode: 'highest',
       });
       // 下面的移动可能会对当前 emptyAncestor 造成影响，所以需要 pathRef 一下
       const emptyPathRef = emptyAncestor && Editor.pathRef(editor, emptyAncestor[1]);
@@ -560,7 +577,7 @@ export const NodeTransforms: NodeTransforms = {
    */
   liftNodes: <T extends Node>(
     editor: Editor,
-    options: liftNodesOptions<T> = {},
+    options: LiftNodesOptions<T> = {},
   ) => {
     Editor.withoutNormalizing(editor, () => {
       const { mode = 'lowest', at = editor.selection } = options;
@@ -613,7 +630,7 @@ export const NodeTransforms: NodeTransforms = {
   // 找到匹配的父节点们，将其子节点上升一层
   unwrapNodes: <T extends Node>(
     editor: Editor,
-    options: unWrapNodesOptions<T> = {},
+    options: UnWrapNodesOptions<T> = {},
   ) => {
     Editor.withoutNormalizing(editor, () => {
       let { at = editor.selection, match } = options;
