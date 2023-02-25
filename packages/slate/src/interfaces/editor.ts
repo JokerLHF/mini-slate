@@ -88,6 +88,11 @@ export interface AfterOptions {
   distance?: number;
 }
 
+export interface EditorVoidOptions {
+  at?: Location
+  mode?: RangeMode
+}
+
 /**
  * slate 本身提供的
  */
@@ -119,6 +124,8 @@ export interface BaseEditor {
   insertFragment: (data: Node[]) => void;
   insertBreak: () => void;
   insertNode: (node: Node) => void;
+
+  isVoid: (element: Element) => boolean;
 }
 
 export type Editor = ExtendedType<BaseEditor>;
@@ -206,6 +213,12 @@ export interface EditorInterface {
   isEmpty: (editor: Editor, element: Element) => boolean;
   string: (editor: Editor, at: Location) => string;
   isBlock: (editor: Editor, value: Element) => boolean;
+
+  isVoid: (editor: Editor, value: Element) => boolean;
+  void: (
+    editor: Editor,
+    options?: EditorVoidOptions
+  ) => NodeEntry<Element> | undefined;
 }
 
 export const root = `__SLATE__${Math.random()}`;
@@ -220,6 +233,21 @@ export const Editor: EditorInterface = {
      * 但是不需要那么复杂，给一个标识就可。标识使用随机数，用户就不可能使用相同的标识混乱。
      */
     return value.root === root;
+  },
+
+
+  isVoid(editor: Editor, value: Element): boolean {
+    return editor.isVoid(value)
+  },
+
+  void(
+    editor: Editor,
+    options: EditorVoidOptions = {}
+  ): NodeEntry<Element> | undefined {
+    return Editor.above(editor, {
+      ...options,
+      match: n => Element.isElement(n) && Editor.isVoid(editor, n),
+    })
   },
 
   isBlock(editor: Editor, value: Element): boolean {

@@ -240,10 +240,7 @@ export const Editable = (props: EditableProps) => {
         Editor.insertText(editor, event.data);
       }, [editor])}
       onKeyDown={useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-        if (onKeyDown) {
-          onKeyDown?.(event);
-          return;
-        }
+        onKeyDown?.(event);
         const { nativeEvent } = event;
         if (HOT_KEYS.isRedo(nativeEvent)) {
           console.log('HOT_KEYS-isRedo');

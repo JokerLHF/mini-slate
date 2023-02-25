@@ -19,6 +19,7 @@ export const createEditor = (): Editor => {
     operations: [],
     onChange: () => {},
     isInline: () => false,
+    isVoid: () => false,
     marks: null,
 
     insertBreak: () => {

@@ -77,7 +77,7 @@ export const TextTransforms: TextTransforms = {
       }
 
       const range = Editor.range(editor, at!);
-      const [start, end] = Range.edges(range);
+      let [start, end] = Range.edges(range);
       // 是否对同一个节点进行删除操作
       const isSingleText = Path.equals(start.path, end.path);
 
@@ -91,6 +91,34 @@ export const TextTransforms: TextTransforms = {
       });
       // 是否跨了不同 block（父节点不同）
       const isAcrossBlocks = startBlock && endBlock && !Path.equals(startBlock[1], endBlock[1]);
+
+      /**
+       * 如果开始节点是空的，那么就往前一个节点。这个空节点最终作为中间节点被删除
+       * 结束节点为空同理
+       */
+      const isStartVoid = Editor.void(editor, { at: start, mode: 'highest' })
+      const isEndVoid = Editor.void(editor, { at: end, mode: 'highest' })
+
+      // If the start or end points are inside an inline void, nudge them out.
+      if (isStartVoid) {
+        const before = Editor.before(editor, start)
+
+        if (
+          before &&
+          startBlock &&
+          Path.isAncestor(startBlock[1], before.path)
+        ) {
+          start = before
+        }
+      }
+
+      if (isEndVoid) {
+        const after = Editor.after(editor, end)
+
+        if (after && endBlock && Path.isAncestor(endBlock[1], after.path)) {
+          end = after
+        }
+      }
 
       const matches: NodeEntry[] = [];
       let lastPath: Path | undefined
