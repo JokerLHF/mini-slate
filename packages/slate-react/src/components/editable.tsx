@@ -4,7 +4,7 @@ import { useSlate } from '../hooks/use-slate';
 import { Element, Text, Transforms, Range, NodeEntry, Editor, Path } from 'slate';
 import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect';
 import { ReactEditor } from '../plugin/react-editor';
-import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING, IS_FOCUSED } from '../utils/weak-map';
+import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, IS_FOCUSED } from '../utils/weak-map';
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
 import HOT_KEYS from '../utils/hotkeys';
@@ -84,8 +84,9 @@ export const Editable = (props: EditableProps) => {
   useIsomorphicLayoutEffect(() => {
     let window;
     if (ref.current && (window = getDefaultView(ref.current))) {
-      EDITOR_TO_WINDOW.set(editor, window)
-      EDITOR_TO_ELEMENT.set(editor, ref.current)
+      EDITOR_TO_WINDOW.set(editor, window);
+      EDITOR_TO_ELEMENT.set(editor, ref.current);
+      ELEMENT_TO_NODE.set(ref.current, editor);
     }
     
     /**
@@ -226,6 +227,7 @@ export const Editable = (props: EditableProps) => {
       contentEditable={true}
       suppressContentEditableWarning // 给标签设置可编辑的属性contentEditable，页面会弹出警告，这个属性去除
       data-slate-editor
+      data-slate-node="value" // 在 toSlateNode 如果遇到没有这个属性的节点，会往上找到这个属性的节点
       style={{
         padding: 20,
         border: '1px black solid',

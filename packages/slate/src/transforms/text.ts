@@ -169,7 +169,7 @@ export const TextTransforms: TextTransforms = {
       const startRef = Editor.pointRef(editor, start);
       const endRef = Editor.pointRef(editor, end);
       // 开始节点
-      if (!isSingleText) {
+      if (!isSingleText && !isStartVoid) {
         const { path, offset } = startRef.current!;
         const node = Node.get(editor, path);
         const text = node.text.slice(offset);
@@ -188,16 +188,18 @@ export const TextTransforms: TextTransforms = {
       }
 
       // 尾部节点
-      const { path, offset } = endRef.current!;
-      const startOffset = isSingleText ? start.offset : 0;
-      const node = Node.get(editor, path);
-      const text = node.text.slice(startOffset, offset);
-      editor.apply({
-        type: 'remove_text',
-        path,
-        offset: startOffset,
-        text,
-      });
+      if (!isEndVoid) {
+        const { path, offset } = endRef.current!;
+        const startOffset = isSingleText ? start.offset : 0;
+        const node = Node.get(editor, path);
+        const text = node.text.slice(startOffset, offset);
+        editor.apply({
+          type: 'remove_text',
+          path,
+          offset: startOffset,
+          text,
+        });
+      }
 
       // 存在尾部节点&开始节点，跨节点的操作。非跨节点的最后会经过 normalize 格式化
       if (

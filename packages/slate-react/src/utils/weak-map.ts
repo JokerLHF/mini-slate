@@ -23,7 +23,6 @@ export const EDITOR_TO_KEY_TO_ELEMENT: WeakMap<
   WeakMap<Key, HTMLElement>
 > = new WeakMap();
 
-
 export const EDITOR_TO_ON_CHANGE = new WeakMap<Editor, () => void>();
 
 // 中文输入法
