@@ -11,6 +11,7 @@ import { Text } from "../interfaces/text";
 export interface TextDeleteOptions {
   reverse?: boolean;
   at?: Location;
+  distance?: number;
 }
 
 interface InsertFragmentOptions {
@@ -63,17 +64,39 @@ export const TextTransforms: TextTransforms = {
     });
   },
 
-  delete(editor: Editor, options?: TextDeleteOptions) {
+  delete(editor: Editor, options: TextDeleteOptions = {}) {
     Editor.withoutNormalizing(editor, () => {
-      let { at = editor.selection } = options || {};
+      let { at = editor.selection, reverse = false, distance = 1 } = options;
+      if (!at) {
+        return;
+      }
+
       if (Range.isRange(at) && Range.isCollapsed(at)) {
         at = at.anchor
       }
 
       // 如果是 point 处理成 range，下面都是统一成 range 的逻辑去处理
       if (Point.isPoint(at)) {
-        const target = Editor.before(editor, at)!;
-        at = { anchor: at, focus: target };
+        const furthestVoid = Editor.void(editor, { at, mode: 'highest' })
+
+        if (furthestVoid) {
+          const [, voidPath] = furthestVoid
+          at = voidPath
+        } else {
+          const opts = { distance };
+          const target = reverse ? Editor.after(editor, at, opts) : Editor.before(editor, at, opts);
+          at = { anchor: at, focus: target! };
+        }
+      }
+      
+      // 如果是 path 直接整体删除即可.包括用户自己用户 at 是 path，或者 void 节点删除
+      if (Path.isPath(at)) {
+        Transforms.removeNodes(editor, { at });
+        return
+      }
+
+      if (Range.isCollapsed(at)) {
+        return;
       }
 
       const range = Editor.range(editor, at!);
@@ -81,6 +104,7 @@ export const TextTransforms: TextTransforms = {
       // 是否对同一个节点进行删除操作
       const isSingleText = Path.equals(start.path, end.path);
 
+      // 到这里 start 就是 point 节点，需要转换为 element 进行操作
       const startBlock = Editor.above(editor, {
         match: n => Element.isElement(n) && Editor.isBlock(editor, n),
         at: start,

@@ -53,10 +53,11 @@ export const Range: RangeInterface = {
     const start = Point.isBefore(s1, s2) ? s2 : s1;
     const end = Point.isBefore(e1, e2) ? e1 : e2;
 
-    if (Point.isBefore(start, end)) {
-      return { anchor: start, focus: end };
+    if (Point.isBefore(end, start)) {
+      return null;
     }
-    return null;
+
+    return { anchor: start, focus: end };
   },
   
   /**

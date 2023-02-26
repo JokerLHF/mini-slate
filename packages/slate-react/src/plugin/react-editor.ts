@@ -277,6 +277,14 @@ export const ReactEditor = {
         if (leafNode) {
           textNode = leafNode.closest('[data-slate-node="text"]')!
           offset = leafNode.textContent!.length;
+          /**
+           * 注意这路有个坑：对于空节点来说会渲染成 uFEFF 作为占位符，给光标站位置，
+           * 但是在 collapse 的情况下， 点击 uFEFF 返回的 domSelection 的 offset 是 1。
+           * 这里需要做修正变为 0, 将所有空节点删除
+           */
+          leafNode.querySelectorAll('[data-slate-zero-width]').forEach(el => {
+            offset -= el.textContent!.length
+          })
         }
       }
     }

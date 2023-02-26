@@ -6,6 +6,8 @@ import { IS_APPLE } from './environment';
  */
 const HOTKEYS = {
   undo: 'mod+z',
+  moveBackward: 'left',
+  moveForward: 'right',
 }
 
 const APPLE_HOTKEYS = {
@@ -41,4 +43,6 @@ const create = (key: string) => {
 export default {
   isRedo: create('redo'),
   isUndo: create('undo'),
+  isMoveBackward: create('moveBackward'), // 往前移动
+  isMoveForward: create('moveForward'), // 往后移动
 }

@@ -11,15 +11,44 @@ export interface SelectionMoveOptions {
   distance?: number;
 }
 
+export interface SelectionCollapseOptions {
+  edge?: SelectionEdge
+}
+
 export interface SelectionTransforms {
   select: (editor: Editor, target: Location) => void;
   deselect: (editor: Editor) => void;
   setSelection: (editor: Editor, props: Partial<Range>) => void;
   move: (editor: Editor, options?: SelectionMoveOptions) => void;
+  collapse: (editor: Editor, options?: SelectionCollapseOptions) => void;
 }
 
 // eslint-disable-next-line no-redeclare
 export const SelectionTransforms: SelectionTransforms = {
+    /**
+   * Collapse the selection.
+   */
+
+  collapse(editor: Editor, options: SelectionCollapseOptions = {}): void {
+    const { edge = 'anchor' } = options;
+    const { selection } = editor;
+
+    if (!selection) {
+      return
+    }
+    
+    if (edge === 'anchor') {
+      Transforms.select(editor, selection.anchor)
+    } else if (edge === 'focus') {
+      Transforms.select(editor, selection.focus)
+    } else if (edge === 'start') {
+      const [start] = Range.edges(selection)
+      Transforms.select(editor, start)
+    } else if (edge === 'end') {
+      const [, end] = Range.edges(selection)
+      Transforms.select(editor, end)
+    }
+  },
   /**
    *  选区是正的: [anchor, focus]
    *  选区是反的: [focus, anchor]
@@ -27,6 +56,8 @@ export const SelectionTransforms: SelectionTransforms = {
    * end 同上
    * anchor: 就直接移动 anchor，
    * focus: 就直接移动 focus
+   * 
+   * reverse 是否往前，默认是往后。移动 distance 位置
    */
   move(editor: Editor, options: SelectionMoveOptions = {}) {
     const { selection } = editor;

@@ -1,10 +1,11 @@
 import React, { memo, useCallback, } from "react";
-import { Element as SlateElement, Range } from 'slate'
+import { Editor, Element as SlateElement, Range, Node as SlateNode } from 'slate'
 import { useChildren } from "../hooks/use-children";
 import { useSlate } from "../hooks/use-slate";
 import { ReactEditor } from "../plugin/react-editor";
-import { EDITOR_TO_KEY_TO_ELEMENT, ELEMENT_TO_NODE } from "../utils/weak-map";
+import { EDITOR_TO_KEY_TO_ELEMENT, ELEMENT_TO_NODE, NODE_TO_INDEX, NODE_TO_PARENT } from "../utils/weak-map";
 import { RenderElementProps, RenderLeafProps } from "./editable";
+import TextComponent from '../components/text';
 
 export const DefaultElement = (props: RenderElementProps) => {
   const { attributes, children, element } = props;
@@ -58,8 +59,38 @@ const Element = (props: {
     attributes['data-slate-inline'] = true
   }
   
-  let children: React.ReactNode = useChildren({ node: element, renderElement, renderLeaf, decorations, selection })
+  let children: React.ReactNode = useChildren({ node: element, renderElement, renderLeaf, decorations, selection });
   
+  if (Editor.isVoid(editor, element)) {
+    attributes['data-slate-void'] = true;
+
+    const Tag = isInline ? 'span' : 'div';
+    // 拿到 child textNode 节点
+    const [[text]] = SlateNode.texts(element);
+
+    // void 节点的
+    children = (
+      <Tag
+        data-slate-spacer
+        style={{
+          height: '0',
+          color: 'transparent',
+          outline: 'none',
+          position: 'absolute',
+        }}
+      >
+        <TextComponent
+          decorations={[]}
+          parent={element}
+          text={text}
+        />
+      </Tag>
+    )
+
+    NODE_TO_INDEX.set(text, 0)
+    NODE_TO_PARENT.set(text, element)
+  }
+
   return renderElement({ attributes, element, children });
 };
 

@@ -70,6 +70,7 @@ export const Editable = (props: EditableProps) => {
     // 开始 & 结束节点都是 editor 中
     if (anchorNodeSelectable && focusNodeSelectable) {
       const range = ReactEditor.toSlateRange(editor, domSelection , { exactMatch: false, suppressThrow: true });      
+      console.log('domSelecton', domSelection, range);
       if (range) {
         Transforms.select(editor, range)
       }
@@ -242,6 +243,8 @@ export const Editable = (props: EditableProps) => {
       onKeyDown={useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
         onKeyDown?.(event);
         const { nativeEvent } = event;
+        const { selection } = editor;
+
         if (HOT_KEYS.isRedo(nativeEvent)) {
           console.log('HOT_KEYS-isRedo');
           (editor as any).redo && (editor as any).redo();
@@ -252,16 +255,49 @@ export const Editable = (props: EditableProps) => {
           (editor as any).undo && (editor as any).undo();
           return;
         }
+        
+        // 鼠标往前
+        if (HOT_KEYS.isMoveBackward(nativeEvent)) {
+          event.preventDefault();
+          if (selection && Range.isCollapsed(selection)) {
+            // 往前移动
+            Transforms.move(editor, { reverse: true });
+          } else {
+            // 多选的情况下往前移动，默认变成合成 collapse 的选区
+            Transforms.collapse(editor, { edge: 'start' });
+          }
+
+          return;
+        }
+
+        // 鼠标往后
+        if (HOT_KEYS.isMoveForward(nativeEvent)) {
+          event.preventDefault()
+
+          if (selection && Range.isCollapsed(selection)) {
+            Transforms.move(editor);
+          } else {
+            Transforms.collapse(editor, { edge: 'end' });
+          }
+
+          return;
+        }
       }, [onKeyDown])}
       onCopy={useCallback((event: React.ClipboardEvent<HTMLDivElement>) => { // command+c
         event.preventDefault();
         ReactEditor.setFragmentData(editor, event.clipboardData);
       }, [])}
-      onFocus={useCallback(() => {
+      onFocus={useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+        event.preventDefault();
         IS_FOCUSED.set(editor, true);
       }, [])}
-      onBlur={useCallback(() => {
+      onBlur={useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+        event.preventDefault();
         IS_FOCUSED.set(editor, false);
+      }, [])}
+      onClick={useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+        event.preventDefault();
+
       }, [])}
     >
       <Children
