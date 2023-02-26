@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useChildren } from '../hooks/use-children';
 import { useSlate } from '../hooks/use-slate';
-import { Element, Text, Transforms, Range, NodeEntry, Editor } from 'slate';
+import { Element, Text, Transforms, Range, NodeEntry, Editor, Path } from 'slate';
 import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect';
 import { ReactEditor } from '../plugin/react-editor';
 import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, IS_COMPOSING, IS_FOCUSED } from '../utils/weak-map';
@@ -256,7 +256,7 @@ export const Editable = (props: EditableProps) => {
           return;
         }
         
-        // 鼠标往前
+        // 鼠标往前并不会触发 selectionChange，所以需要这里监听
         if (HOT_KEYS.isMoveBackward(nativeEvent)) {
           event.preventDefault();
           if (selection && Range.isCollapsed(selection)) {
@@ -270,10 +270,9 @@ export const Editable = (props: EditableProps) => {
           return;
         }
 
-        // 鼠标往后
+        // 鼠标往后并不会触发 selectionChange，所以需要这里监听
         if (HOT_KEYS.isMoveForward(nativeEvent)) {
-          event.preventDefault()
-
+          event.preventDefault();
           if (selection && Range.isCollapsed(selection)) {
             Transforms.move(editor);
           } else {
@@ -297,7 +296,26 @@ export const Editable = (props: EditableProps) => {
       }, [])}
       onClick={useCallback((event: React.MouseEvent<HTMLDivElement>) => {
         event.preventDefault();
+        if (!hasEditableTarget(editor, event.target)) {
+          return;
+        }
 
+        // 对于图片场景，点击图片并没有聚焦到某一个节点，单纯只是点击某一个节点。这个时候并没有出发 selectionChange，需要这里监听
+        const node = ReactEditor.toSlateNode(editor, event.target);
+        const path = ReactEditor.findPath(editor, node);
+        const start = Editor.start(editor, path)
+        const end = Editor.end(editor, path)
+        const startVoid = Editor.void(editor, { at: start })
+        const endVoid = Editor.void(editor, { at: end })
+
+        if (
+          startVoid &&
+          endVoid &&
+          Path.equals(startVoid[1], endVoid[1])
+        ) {
+          const range = Editor.range(editor, start);
+          Transforms.select(editor, range);
+        }
       }, [])}
     >
       <Children
