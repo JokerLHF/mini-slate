@@ -70,7 +70,6 @@ export const Editable = (props: EditableProps) => {
     // 开始 & 结束节点都是 editor 中
     if (anchorNodeSelectable && focusNodeSelectable) {
       const range = ReactEditor.toSlateRange(editor, domSelection , { exactMatch: false, suppressThrow: true });      
-      console.log('domSelecton', domSelection, range);
       if (range) {
         Transforms.select(editor, range)
       }
@@ -256,7 +255,12 @@ export const Editable = (props: EditableProps) => {
           return;
         }
         
-        // 鼠标往前并不会触发 selectionChange，所以需要这里监听
+        /**
+         * COMPAT: 如果选择了空节点，或者选择了与内联相邻的零宽度文本节点，我们需要手动处理这些热键，因为浏览器将会跳过零宽度空间的空节点。
+         * 比如 【节点A，空节点，节点B】，在节点B往前，在 selectionChange 拿到的是节点A。
+         * 具体可以拿 mention 例子，聚焦在 mention 之后，随后鼠标往前移动。 从 selectionChange 拿到的不是 menton 的空节点，而是 mention 的前一个节点
+         */
+        // 鼠标往前。
         if (HOT_KEYS.isMoveBackward(nativeEvent)) {
           event.preventDefault();
           if (selection && Range.isCollapsed(selection)) {
@@ -270,7 +274,7 @@ export const Editable = (props: EditableProps) => {
           return;
         }
 
-        // 鼠标往后并不会触发 selectionChange，所以需要这里监听
+        // 鼠标往后
         if (HOT_KEYS.isMoveForward(nativeEvent)) {
           event.preventDefault();
           if (selection && Range.isCollapsed(selection)) {
