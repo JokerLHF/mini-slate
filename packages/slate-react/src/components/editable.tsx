@@ -163,6 +163,14 @@ export const Editable = (props: EditableProps) => {
   }, [scheduleOnDOMSelectionChange]);
 
   const onBeforeInput = useCallback((event: InputEvent) => {
+    /**
+     * 如果不是对 slateElement/slateText/slateEditor 的 onBeforeInput要忽略，因为不会涉及到 value 的改变
+     * 比如 业务自己写了一个 input，但是这个 input 不是 slateElement，这个时候不做任何处理
+     */
+    if (hasEditableTarget(editor, event.target)) {
+      return;
+    }
+
     // 中文环境交给浏览器渲染    
     if (ReactEditor.isComposing(editor)) {
       return;
