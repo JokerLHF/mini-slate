@@ -213,6 +213,7 @@ export interface EditorInterface {
   isEmpty: (editor: Editor, element: Element) => boolean;
   string: (editor: Editor, at: Location) => string;
   isBlock: (editor: Editor, value: Element) => boolean;
+  isInline: (editor: Editor, value: Element) => boolean;
 
   isVoid: (editor: Editor, value: Element) => boolean;
   void: (
@@ -235,6 +236,9 @@ export const Editor: EditorInterface = {
     return value.root === root;
   },
 
+  isInline(editor: Editor, value: Element): boolean {
+    return editor.isInline(value)
+  },
 
   isVoid(editor: Editor, value: Element): boolean {
     return editor.isVoid(value)
@@ -698,8 +702,21 @@ export const Editor: EditorInterface = {
       reverse: mode === 'lowest',
     })) {
       const [n, p] = nodeEntry;
-      if (!Text.isText(n) && !Path.equals(p, path)) {
-        return nodeEntry;
+      if (Text.isText(n)) {
+        continue;
+      }
+      /**
+       * 比较极端的情况，比如传入的是 range，用户的 match 只能匹配到 textElement。
+       * 那么得到的结果肯定就是 range
+       */
+      if (Range.isRange(at)) {
+        if (Path.isAncestor(p, at.anchor.path) && Path.isAncestor(p, at.focus.path)) {
+          return [n, p]
+        }
+      } else {
+        if (!Path.equals(path, p)) {
+          return [n, p]
+        }
       }
     }
   },
@@ -755,6 +772,10 @@ export const Editor: EditorInterface = {
     return prev;
   },
 
+  /**
+   * 默认是从 editor 往下到节点，
+   * reverse 表示是从 节点往上到 editor
+   */
   *levels<T extends Node>(
     editor: Editor,
     options: EditorLevelsOptions<T> = {}
