@@ -114,7 +114,7 @@ const MarkButton = ({ format, icon}: { format: string, icon: string }) => {
 
 const isMarkActive = (editor, format) => {
   const marks = Editor.marks(editor)
-  return marks ? marks[format] === true : false
+  return !!marks[format];
 }
 
 const toggleMark = (editor, format) => {
@@ -152,9 +152,7 @@ const isBlockActive = (editor, format, blockType = 'type') => {
   const [match] = Array.from(
     Editor.nodes(editor, {
       at: selection,
-      match: n =>
-        SlateElement.isElement(n) &&
-        n[blockType] === format,
+      match: n => SlateElement.isElement(n) && n[blockType] === format,
     })
   )
 

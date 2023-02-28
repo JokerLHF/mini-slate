@@ -31,6 +31,7 @@ export type EditableProps = {
   renderLeaf?: (props: RenderLeafProps) => JSX.Element;
   decorate?: (entry: NodeEntry) => Range[];
   onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onDOMBeforeInput?: (event: InputEvent) => void
 };
 
 const Children = (props: Parameters<typeof useChildren>[0]) => {
@@ -43,6 +44,7 @@ export const Editable = (props: EditableProps) => {
     renderElement,
     renderLeaf,
     onKeyDown,
+    onDOMBeforeInput: propsOnDOMBeforeInput
   } = props;
 
   const Component = 'div';
@@ -163,6 +165,7 @@ export const Editable = (props: EditableProps) => {
   }, [scheduleOnDOMSelectionChange]);
 
   const onBeforeInput = useCallback((event: InputEvent) => {
+    propsOnDOMBeforeInput?.(event);
     /**
      * 如果不是对 slateElement/slateText/slateEditor 的 onBeforeInput要忽略，因为不会涉及到 value 的改变
      * 比如 业务自己写了一个 input，但是这个 input 不是 slateElement，这个时候不做任何处理
@@ -211,7 +214,7 @@ export const Editable = (props: EditableProps) => {
       default:
         break;
     }
-  }, [editor]);
+  }, [editor, propsOnDOMBeforeInput]);
 
   useIsomorphicLayoutEffect(() => {    
     ref.current?.addEventListener('beforeinput', onBeforeInput);
