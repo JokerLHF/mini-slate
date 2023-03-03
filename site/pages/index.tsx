@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react'
-import { Editable, withReact, Slate, RenderLeafProps, useSlate } from 'slate-react';
+import { Editable, withReact, Slate, RenderLeafProps, useSlateStatic } from 'slate-react';
 import { createEditor, Editor, Descendant, Transforms, Element as SlateElement } from 'slate';
 import { withHistory } from 'slate-history';
 
@@ -10,14 +10,14 @@ const initialValue: Descendant[] = [
     children: [
       { children: [{text: '111'}] },
       { children: [{text: '222'}] },
-      { children: [{text: '333'}] },
-      { children: [{text: '444'}] },
-      { children: [{text: '555'}] },
-      { children: [
-        { children: [
-          { children: [{text: '666'}]}
-        ]}
-      ] },
+      // { children: [{text: '333'}] },
+      // { children: [{text: '444'}] },
+      // { children: [{text: '555'}] },
+      // { children: [
+      //   { children: [
+      //     { children: [{text: '666'}]}
+      //   ]}
+      // ] },
     ]
   },
 ]
@@ -98,7 +98,7 @@ const Element = ({ attributes, children, element }) => {
 }
 
 const MarkButton = ({ format, icon}: { format: string, icon: string }) => {
-  const editor = useSlate();
+  const editor = useSlateStatic();
   return (
     <Button
       onMouseDown={event => {
@@ -127,7 +127,7 @@ const toggleMark = (editor, format) => {
 }
 
 const BlockButton = ({ format, icon }) => {
-  const editor = useSlate()
+  const editor = useSlateStatic()
   return (
     <Button
       onMouseDown={event => {

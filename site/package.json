@@ -17,9 +17,5 @@
     "slate": "workspace:^1.0.0",
     "slate-history": "workspace:^1.0.0",
     "slate-react": "workspace:^1.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "18.11.17",
-    "@types/react": "^18.0.21"
   }
 }

@@ -1,13 +1,14 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useChildren } from '../hooks/use-children';
-import { useSlate } from '../hooks/use-slate';
-import { Element, Text, Transforms, Range, NodeEntry, Editor, Path } from 'slate';
+import { Element, Text, Transforms, Range, NodeEntry, Editor, Path, BaseRange } from 'slate';
 import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect';
 import { ReactEditor } from '../plugin/react-editor';
 import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, IS_FOCUSED } from '../utils/weak-map';
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
 import HOT_KEYS from '../utils/hotkeys';
+import { useSlateStatic } from '../hooks/use-slate-static';
+import { useSlate } from '../hooks/use-slate';
 
 export interface RenderElementProps {
   children: any;
@@ -34,6 +35,10 @@ export type EditableProps = {
   onDOMBeforeInput?: (event: InputEvent) => void
 };
 
+export type DecorationType = BaseRange & {
+
+}
+
 const Children = (props: Parameters<typeof useChildren>[0]) => {
   const children = useChildren(props);  
   return <React.Fragment>{children}</React.Fragment>
@@ -48,9 +53,13 @@ export const Editable = (props: EditableProps) => {
   } = props;
 
   const Component = 'div';
+  /**
+   * 这里必须用 useSlate 而不是 useSlateStatic，因为当发生 op 的时候， version 发生变化，editable 需要 re-render
+   * 而 useSlateStatic 没有 version，所以不会 re-render
+   */
   const editor = useSlate();
   const ref = useRef<HTMLDivElement>(null);
-  const decorations = [];
+  const decorations: DecorationType[] = [];
 
   const onDOMSelectionChange = useCallback(throttle(() => {
     // 中文环境不处理 selection, 等 compositionEnd 之后再出来    
@@ -170,7 +179,7 @@ export const Editable = (props: EditableProps) => {
      * 如果不是对 slateElement/slateText/slateEditor 的 onBeforeInput要忽略，因为不会涉及到 value 的改变
      * 比如 业务自己写了一个 input，但是这个 input 不是 slateElement，这个时候不做任何处理
      */
-    if (hasEditableTarget(editor, event.target)) {
+    if (!hasEditableTarget(editor, event.target)) {
       return;
     }
 

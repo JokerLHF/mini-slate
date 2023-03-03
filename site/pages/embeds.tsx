@@ -10,7 +10,6 @@ import {
   Editable,
   withReact,
   ReactEditor,
-  useSlate,
 } from 'slate-react'
 
 const EmbedsExample = () => {
@@ -43,7 +42,7 @@ const Element = props => {
 }
 
 const VideoElement = ({ attributes, children, element }) => {
-  const editor = useSlate()
+  const editor = useSlateStatic()
   const { url } = element
   return (
     <div {...attributes}>

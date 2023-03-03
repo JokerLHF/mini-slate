@@ -1,18 +1,18 @@
 import React from "react";
 import { Ancestor, Descendant, Editor, Element, Range } from "slate";
-import { RenderElementProps, RenderLeafProps } from "../components/editable";
+import { DecorationType, RenderElementProps, RenderLeafProps } from "../components/editable";
 import ElementComponent from '../components/element';
 import TextComponent from '../components/text';
 import { ReactEditor } from "../plugin/react-editor";
 import { NODE_TO_INDEX, NODE_TO_PARENT } from "../utils/weak-map";
 import { SelectedContext } from "./use-selected";
-import { useSlate } from "./use-slate";
+import { useSlateStatic } from "./use-slate-static";
 
 export const useChildren = (props: {
   node: Ancestor
   renderElement?: (props: RenderElementProps) => JSX.Element,
   renderLeaf?: (props: RenderLeafProps) => JSX.Element,
-  decorations: Range[],
+  decorations: DecorationType[],
   selection: Range | null
 }) => {
   const {
@@ -23,7 +23,7 @@ export const useChildren = (props: {
     selection,
   } = props;
 
-  const editor = useSlate();
+  const editor = useSlateStatic();
   const path = ReactEditor.findPath(editor, node);
   const children: JSX.Element[] = [];
 
@@ -31,6 +31,7 @@ export const useChildren = (props: {
     const p = path.concat(i)
     const n = node.children[i] as Descendant;
     const key = ReactEditor.findKey(editor, n);
+
     const range = Editor.range(editor, p);
     // 选区存在交集就代表被选中
     const sel = selection && Range.intersection(range, selection);
@@ -44,6 +45,7 @@ export const useChildren = (props: {
             renderElement={renderElement}
             renderLeaf={renderLeaf}
             selection={selection}
+            key={key.id}
           />
         </SelectedContext.Provider>
       )

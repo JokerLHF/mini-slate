@@ -5,6 +5,7 @@ import { useIsomorphicLayoutEffect } from "../hooks/use-isomorphic-layout-effect
 import { SlateContext, SlateContextValue } from "../hooks/use-slate"
 import { ReactEditor } from "../plugin/react-editor"
 import { EDITOR_TO_ON_CHANGE } from "../utils/weak-map"
+import { EditorContext } from '../hooks/use-slate-static';
 
 export const Slate = (props: {
   editor: ReactEditor
@@ -54,9 +55,11 @@ export const Slate = (props: {
 
   return (
     <SlateContext.Provider value={context}>
-      <FocusedContext.Provider value={isFocus}>
-        {children}
-      </FocusedContext.Provider>
+      <EditorContext.Provider value={context.editor}>
+        <FocusedContext.Provider value={isFocus}>
+          {children}
+        </FocusedContext.Provider>
+      </EditorContext.Provider>
     </SlateContext.Provider>
   );
 }

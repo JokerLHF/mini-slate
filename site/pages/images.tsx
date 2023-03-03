@@ -7,7 +7,7 @@ import {
   useFocused,
   withReact,
   ReactEditor,
-  useSlate,
+  useSlateStatic,
 } from 'slate-react'
 import { withHistory } from 'slate-history'
 import { css } from '@emotion/css'
@@ -21,7 +21,7 @@ interface IImageElement {
 }
 
 const InsertImageButton = () => {
-  const editor = useSlate();
+  const editor = useSlateStatic();
   return (
     <Button
       onMouseDown={event => {
@@ -82,7 +82,7 @@ const Element = props => {
 }
 
 const Image = ({ attributes, children, element }) => {
-  const editor = useSlate()
+  const editor = useSlateStatic()
   const path = ReactEditor.findPath(editor, element)
   const selected = useSelected()
   const focused = useFocused()

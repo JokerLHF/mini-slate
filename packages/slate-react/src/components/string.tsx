@@ -1,6 +1,6 @@
 import React from 'react'
 import { Element, Text } from 'slate'
-import { useSlate } from '../hooks/use-slate'
+import { useSlateStatic } from '../hooks/use-slate-static'
 
 /**
  * Leaf content strings.
@@ -12,7 +12,7 @@ const String = (props: {
   parent: Element
 }) => {
   const { text, parent, leaf } = props;
-  const editor = useSlate();
+  const editor = useSlateStatic();
 
   /**
    *  {

@@ -4,7 +4,7 @@ import {
   Editable,
   withReact,
   ReactEditor,
-  useSlate,
+  useSlateStatic,
 } from 'slate-react'
 import {
   Editor,
@@ -125,7 +125,7 @@ const Element = props => {
 }
 
 const CheckListItemElement = ({ attributes, children, element }) => {
-  const editor = useSlate()
+  const editor = useSlateStatic()
   const { checked } = element
   return (
     <div

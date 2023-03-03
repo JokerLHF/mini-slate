@@ -28,12 +28,20 @@ export interface RangeInterface {
   points: (range: Range) => Generator<PointEntry, void, undefined>;
   includes: (range: Range, target: Path) => boolean;
   intersection: (range: Range, anchor: Range) => Range | null;
+  equals: (range: Range, another: Range) => boolean;
 }
 
 export const Range: RangeInterface = {
   *points(range: Range): Generator<PointEntry, void, undefined> {
     yield [range.anchor, 'anchor']
     yield [range.focus, 'focus']
+  },
+
+  equals(range: Range, another: Range): boolean {
+    return (
+      Point.equals(range.anchor, another.anchor) &&
+      Point.equals(range.focus, another.focus)
+    )
   },
 
   isRange(value: any): value is Range {

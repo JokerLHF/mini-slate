@@ -1,19 +1,19 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Element, Text as SlateText, Range } from 'slate'
 import { useIsomorphicLayoutEffect } from "../hooks/use-isomorphic-layout-effect";
-import { useSlate } from "../hooks/use-slate";
+import { useSlateStatic } from "../hooks/use-slate-static";
 import { ReactEditor } from "../plugin/react-editor";
 import { EDITOR_TO_KEY_TO_ELEMENT, ELEMENT_TO_NODE } from "../utils/weak-map";
-import { RenderLeafProps } from "./editable";
+import { DecorationType, RenderLeafProps } from "./editable";
 import Leaf from './leaf';
 
 const Text = (props: {
   renderLeaf?: (props: RenderLeafProps) => JSX.Element
   text: SlateText,
   parent: Element,
-  decorations: Range[],
+  decorations: DecorationType[],
 }) => {
-  const editor = useSlate();
+  const editor = useSlateStatic();
   const ref = useRef<HTMLSpanElement>(null);
 
   const { text, renderLeaf, parent, decorations } = props;
