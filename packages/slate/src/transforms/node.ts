@@ -88,14 +88,15 @@ export const NodeTransforms: NodeTransforms = {
     Editor.withoutNormalizing(editor, () => {
       const { mode = 'lowest' } = options;
       let { at = editor.selection, match, always = false } = options;
-      let depth = 0;
+      let height = 0;
 
       // path 需要拿到 父节点，因为 splitNode 如果是 Path 是根据父节点删除子节点的逻辑处理
       if (Path.isPath(at)) {
         const point = Editor.point(editor, at);
         const [parent] = Editor.parent(editor, at);
         match = n => n === parent;
-        depth = at.length -1;
+        // 高度是从1开始算起的，也就是说 [0,0] 高度是 2
+        height = point.path.length - at.length + 1;
         always = true;
         at = point;
       }
@@ -125,15 +126,31 @@ export const NodeTransforms: NodeTransforms = {
       if (!highestPath) {
         return;
       }
-      const position = depth ? at.path[depth]: at.offset;
+      // 算出当前 path 的深度
+      const depth = at.path.length - height;
+      let position = height ? at.path[depth]: at.offset;
+      const lowestPath = at.path.slice(0, depth);
 
-      // 处于节点最左边或者最右边不处理
-      if (always || !Editor.isEdge(editor, at, at.path)) {
-        editor.apply({
-          type: 'split_node',
-          position,
-          path: highestPath,
-        });
+      for (const [_, path] of Editor.levels(editor, { 
+        at: lowestPath,
+        reverse: true,
+      })) {
+        let split = false;
+        if (path.length < highestPath.length || !path.length) {
+          break
+        }
+        // 处于节点最左边或者最右边不处理
+        if (always || !Editor.isEdge(editor, at, path)) {
+          split = true;
+          editor.apply({
+            type: 'split_node',
+            position,
+            path,
+          });
+        }
+        // 第一次 position 是用来 split SlateTextNode 的，
+        // 后续的 position 是用来 split Slate ElementNode 的
+        position = path[path.length - 1] + (split ? 1 : 0)
       }
     });
   },
