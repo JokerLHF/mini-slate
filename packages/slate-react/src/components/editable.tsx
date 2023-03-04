@@ -217,7 +217,6 @@ export const Editable = (props: EditableProps) => {
         break;
       }
       case 'insertParagraph': { // 换行
-        debugger
         Editor.insertBreak(editor);
         break;
       }

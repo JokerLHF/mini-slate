@@ -130,33 +130,25 @@ export const ReactEditor = {
    */
   toSlateRange(
     editor: ReactEditor,
-    domRange: DOMRange | DOMStaticRange | DOMSelection,
+    domRange: DOMSelection,
     options: {
       exactMatch: boolean
       suppressThrow: boolean  // 压制错误，不处理错误
     }
   ): Range | null {
     const { exactMatch, suppressThrow } = options
-    const el = isDOMSelection(domRange)? domRange.anchorNode : domRange.startContainer
+    const el = domRange.anchorNode
     let anchorNode;
     let anchorOffset;
     let focusNode;
     let focusOffset;
     let isCollapsed;
     if (el) {
-      if (isDOMSelection(domRange)) {
-        anchorNode = domRange.anchorNode;
-        anchorOffset = domRange.anchorOffset;
-        focusNode = domRange.focusNode;
-        focusOffset = domRange.focusOffset;
-        isCollapsed = domRange.isCollapsed;
-      } else {
-        anchorNode = domRange.startContainer;
-        anchorOffset = domRange.startOffset;
-        focusNode = domRange.endContainer;
-        focusOffset = domRange.endOffset;
-        isCollapsed = domRange.collapsed;
-      }
+      anchorNode = domRange.anchorNode;
+      anchorOffset = domRange.anchorOffset;
+      focusNode = domRange.focusNode;
+      focusOffset = domRange.focusOffset;
+      isCollapsed = domRange.isCollapsed;
     }
 
     if (
