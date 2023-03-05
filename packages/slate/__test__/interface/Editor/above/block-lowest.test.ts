@@ -1,7 +1,4 @@
-import { createEditor } from '../../../../src/create-editor'
-import { Descendant } from '../../../../src/interfaces/node'
-import { Editor } from '../../../../src/interfaces/editor'
-import { Element } from '../../../../src/interfaces/element'
+import { createEditor, Descendant, Editor, Element } from '@src/index'
 
 const children: Descendant[] = [
   {
@@ -21,7 +18,7 @@ const output = [
 ]
 
 describe('editor.above', () => {
-  let editor;
+  let editor: Editor;
 
   beforeAll(() => {
     editor = createEditor();

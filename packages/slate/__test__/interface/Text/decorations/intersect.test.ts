@@ -1,4 +1,4 @@
-import { Text } from '../../../../src/interfaces/text'
+import { Text } from '@src/index'
 
 const input = [
   {

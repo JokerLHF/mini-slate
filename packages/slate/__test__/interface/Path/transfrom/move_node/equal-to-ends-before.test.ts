@@ -1,5 +1,4 @@
-import { Operation } from "../../../../../src/interfaces/operation";
-import { Path } from "../../../../../src/interfaces/path";
+import { Operation, Path } from '@src/index'
 
 const path = [3, 3]
 

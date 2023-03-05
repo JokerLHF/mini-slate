@@ -1,6 +1,4 @@
-import { createEditor } from "../../../../src/create-editor";
-import { Descendant } from "../../../../src/interfaces/node";
-import { Transforms } from "../../../../src/transforms";
+import { createEditor, Descendant, Editor, Transforms } from '@src/index'
 
 const output: Descendant[] = [
   {
@@ -17,7 +15,7 @@ const children: Descendant[] = [
 ]
 
 describe('transfroms.liftNodes', () => {
-  let editor;
+  let editor: Editor;
 
   beforeAll(() => {
     editor = createEditor();

@@ -1,7 +1,4 @@
-import { createEditor } from "../../../../src/create-editor";
-import { Descendant } from "../../../../src/interfaces/node";
-import { Transforms } from "../../../../src/transforms";
-import { Element as SlateElement } from '../../../../src/interfaces/element';
+import { createEditor, Descendant, Editor, Transforms, Element } from '@src/index'
 
 const children: Descendant[] = [
   {
@@ -22,7 +19,7 @@ const output: Descendant[] = [
 ]
 
 describe('transfroms.moveNodes', () => {
-  let editor;
+  let editor: Editor;
 
   beforeAll(() => {
     editor = createEditor();
@@ -32,7 +29,7 @@ describe('transfroms.moveNodes', () => {
 
   it('block', () => {
     Transforms.moveNodes(editor, {
-      match: n => SlateElement.isElement(n),
+      match: n => Element.isElement(n),
       to: [1],
     });
     expect(editor.children).toStrictEqual(output);
