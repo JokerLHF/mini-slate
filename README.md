@@ -16,4 +16,5 @@ pnpm run start
 
 
 # 文章：
-[了解 slate 设计（理论）](https://n1pwb3impj.feishu.cn/wiki/wikcnIO8JFKdzhW3HYJDg40zzlg)
+- [了解 slate 设计（理论）](https://n1pwb3impj.feishu.cn/wiki/wikcnIO8JFKdzhW3HYJDg40zzlg)
+- [了解 slate operation 设计](https://n1pwb3impj.feishu.cn/wiki/wikcnIoFgguvfdYdC4LqNbJZYIb)
