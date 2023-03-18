@@ -39,5 +39,3 @@ describe('transfroms.moveNodes', () => {
     editor.selection = { anchor: { path: [1,0], offset: 0 }, focus: {path: [1,0], offset: 0 } };
   })
 })
-
-

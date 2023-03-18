@@ -83,20 +83,24 @@ export const Point: PointInterface = {
       switch (op.type) {
         case 'insert_text': {
           // 指向 insertText 的位置
-          const { path, text, offset } = op;
-          if (Path.equals(path, p.path) && p.offset === offset) {
-            p.offset += text.length
+          const { path, offset } = op;
+          if (
+            Path.equals(op.path, path) &&
+            (op.offset < offset ||
+              (op.offset === offset && affinity === 'forward'))
+          ) {
+            p.offset += op.text.length
           }
           break;
         }
         case 'remove_text': {
-          const { path } = op;
+          const { path, offset } = op;
           /**
            * 12|3
            * 从23交界处删除一个字符，此时的 op.offset 是 1， path.offset 是2
            */
-          if (Path.equals(path, p.path) && op.offset <= p.offset) {
-            p.offset -= p.offset - op.offset;
+           if (Path.equals(op.path, path) && op.offset <= offset) {
+            p.offset -= Math.min(offset - op.offset, op.text.length)
           }
           break;
         }

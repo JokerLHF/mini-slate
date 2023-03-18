@@ -281,7 +281,7 @@ export const Path: PathInterface = {
             p[op.path.length - 1] += 1
           } 
           // 这个逻辑是对于 slateElement 的分割来说的，也就是 { path: [0,0], position: 1 }，
-          // 其实是对 [0,0] 的第一个children分隔，对于 [0,0] 第二个 children，第三个 children 节点的 path 需要改变，
+          // 其实是对 [0,0] 的第一个children分隔，对于 [0,0] 第二个 children，第三个 children 节点的 path 需要改变，但是对于 第[0]个 children 不需要改变
           // 所以才有 p[op.path.length] >= op.position
           else if (Path.isAncestor(op.path, p) && p[op.path.length] >= op.position) {
             /**
@@ -369,7 +369,6 @@ export const Path: PathInterface = {
           if (Path.isAncestor(path, p) || Path.equals(path, p)) {
             const copyPath = newPath.slice();
             // 跨层级删除了一个节点，需要改变位置需要 -1
-            // 同层级只是移动
             if (Path.endsBefore(path, newPath) && path.length < newPath.length) {
               copyPath[path.length - 1] -= 1;
             }

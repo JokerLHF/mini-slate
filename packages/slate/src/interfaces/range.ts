@@ -133,9 +133,18 @@ export const Range: RangeInterface = {
           // 结束节点保持不变
           affinityFocus = isCollapsed ? 'forward' : 'backward';
         }
-      } else {
-        // TODO
-      }
+      } else if (affinity === 'outward') {
+        if (!Range.isBackward(r)) {
+          affinityAnchor = 'backward' // 开始节点不变
+          affinityFocus = 'forward' // 结束节点指向下一个
+        } else {
+          affinityAnchor = 'forward' // 开始节点指向下一个节点
+          affinityFocus = 'backward' // 结束节点保持不变
+        }
+    } else {
+        affinityAnchor = affinity
+        affinityFocus = affinity
+    }
       const anchor = Point.transform(r.anchor, op, { affinity: affinityAnchor })
       const focus = Point.transform(r.focus, op, { affinity: affinityFocus })
 
