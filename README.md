@@ -19,3 +19,4 @@ pnpm run start
 - [了解 slate 设计（理论）](https://n1pwb3impj.feishu.cn/wiki/wikcnIO8JFKdzhW3HYJDg40zzlg)
 - [slate operation 设计](https://n1pwb3impj.feishu.cn/wiki/wikcnIoFgguvfdYdC4LqNbJZYIb)
 - [slate ref 设计](https://n1pwb3impj.feishu.cn/wiki/wikcnK1jiv6Q7tIbcZcbYF698X0)
+- [slate 历史记录](https://n1pwb3impj.feishu.cn/wiki/wikcnAn27fQYHMoAUWISS47kXRd)
