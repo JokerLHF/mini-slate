@@ -1,6 +1,5 @@
-import { Editor, Operation, Path } from 'slate';
+import { Editor, Operation, Path, Selection, Transforms } from 'slate';
 import { HistoryEditor } from './history-editor';
-
 
 export const withHistory = <T extends Editor>(editor: T) => {
   const e = editor as T & HistoryEditor;
@@ -10,14 +9,21 @@ export const withHistory = <T extends Editor>(editor: T) => {
   
   e.redo = () => {
     const { history } = e;
-    const batch = history.redos[history.redos.length - 1];
+    const { redos } = history;
+    const batch = redos[redos.length - 1];
     if (!batch) {
       return;
     }
 
+    // redo selection
+    if (batch.selectionBefore) {
+      Transforms.setSelection(e, batch.selectionBefore)
+    }
+    
+    // redo op
     HistoryEditor.withoutSaving(e, () => {
       Editor.withoutNormalizing(e, () => {
-        for (const op of batch) {
+        for (const op of batch.operations) {
           e.apply(op)
         }
         // redo 结束之后，将 redobatch 放入 undo，随后取消 redo
@@ -29,17 +35,24 @@ export const withHistory = <T extends Editor>(editor: T) => {
 
   e.undo = () => {
     const { history } = e;
-    const batch = history.undos[history.undos.length - 1];
+    const { undos } = history;
+    const batch = undos[undos.length - 1];
     if (!batch) {
       return;
     }
 
     HistoryEditor.withoutSaving(e, () => {
       Editor.withoutNormalizing(e, () => {
-        const inverseOps = batch.map(Operation.inverse).reverse();
+        const inverseOps = batch.operations.map(Operation.inverse).reverse();
+        // undo op
         for (const op of inverseOps) {
           e.apply(op)
         }
+        // undo selection
+        if (batch.selectionBefore) {
+          Transforms.setSelection(e, batch.selectionBefore)
+        }
+
         // undo 结束之后，将 undoBatch 放入 redo，随后取消 undo
         history.redos.push(batch)
         history.undos.pop()
@@ -50,7 +63,7 @@ export const withHistory = <T extends Editor>(editor: T) => {
   e.apply = (op: Operation) => {
     const { history: { undos }, operations } = e;
     const lastBatch = undos[undos.length - 1];
-    const lastOp = lastBatch && lastBatch[lastBatch.length - 1];
+    const lastOp = lastBatch && lastBatch.operations[lastBatch.operations.length - 1];
 
     // 1. 判断是否需要保留在历史记录中
     let save = HistoryEditor.isSaving(e);
@@ -59,7 +72,6 @@ export const withHistory = <T extends Editor>(editor: T) => {
     }
 
     let merge = HistoryEditor.isMering(e);
-    let overwrite = shouldOverwrite(op, lastOp);
     if (save) {
       if (merge === undefined) {
         // 2. 判断是否需要合并到同一个历史记录中
@@ -75,13 +87,13 @@ export const withHistory = <T extends Editor>(editor: T) => {
 
       // 3. 需要合并则合并到同一个历史记录中，不需要则重写开一个历史记录栈
       if (lastBatch && merge) {
-        if (overwrite) {
-          lastBatch.pop();
-        }
-        lastBatch.push(op);
+        lastBatch.operations.push(op)
       } else {
-        const newBatch = [op];
-        undos.push(newBatch);
+        const batch = {
+          operations: [op],
+          selectionBefore: e.selection,
+        }
+        undos.push(batch);
       }
 
       // 4. undo栈只能保留100个
@@ -111,14 +123,8 @@ export const withHistory = <T extends Editor>(editor: T) => {
  * 判断是否需要放到历史记录中
  */
 const shouldSave = (op: Operation) => {
-  /**
-   * 对于 select/deselect 这种一开始设置选区或者最后取消选区不需要记录到历史记录中。
-   * 选区只有 setSelection 从一个 selection 设置为另一个 selection 才需要记录
-   */
-  if (
-    op.type === 'set_selection' &&
-    (op.newProperties === null || op.properties === null)
-  ) {
+  // 选区不放在历史记录
+  if (op.type === 'set_selection') {
     return false;
   }
 
@@ -129,20 +135,17 @@ const shouldSave = (op: Operation) => {
  * slate 自身的一些优化手段来判断当前 op 是否应该和上一次 op 放在同一个 undo redo 栈中。
  * 注意这里即使两次 op 不在同一个事件循环中也有可能会被合并，比如连续插入 text
  */
-const shouldMerge = (op: Operation, lastOp: Operation | undefined) => {
-  // 连续一段连续的文本，随后删除。这个时候对于选区的选择应该合并在同一个历史记录中
-  if (op.type === 'set_selection') {
-    return true;
-  }
+const shouldMerge = (op: Operation, prev: Operation | undefined) => {
   /**
    * 处理连续插入 text 的场景，上一次插入 text 之后继续插入 text
    * 这里有一个体验问题：在 undo 的时候会出问题。比如我连续插入3个1，undo 的时候预期是回退3次，目前只会回退一次。但是竞品其实也大多这个干
    */
   if (
-    lastOp &&
-    lastOp.type === 'insert_text' &&
+    prev &&
+    prev.type === 'insert_text' &&
     op.type === 'insert_text' && 
-    Path.equals(op.path, lastOp.path)
+    op.offset === prev.offset + prev.text.length &&
+    Path.equals(op.path, prev.path)
   ) {
     return true;
   }
@@ -152,27 +155,14 @@ const shouldMerge = (op: Operation, lastOp: Operation | undefined) => {
    * 同上的体验问题
    */
   if (
-    lastOp &&
-    lastOp.type === 'remove_text' &&
+    prev &&
+    prev.type === 'remove_text' &&
     op.type === 'remove_text' && 
-    Path.equals(op.path, lastOp.path)
+    op.offset === prev.offset - op.text.length &&
+    Path.equals(op.path, prev.path)
   ) {
     return true;
   }
 
-  return false;
-}
-
-/**
- * 对于一些相同的 op 只需要保留一个即可，比如连续移动光标，undo/redo 不需要全部记录，只需要记录最后一个
- */
-const shouldOverwrite = (op: Operation, lastOp: Operation | undefined) => {
-  if (
-    lastOp &&
-    lastOp.type === 'set_selection' &&
-    op.type === 'set_selection'
-  ) {
-    return true;
-  }
   return false;
 }

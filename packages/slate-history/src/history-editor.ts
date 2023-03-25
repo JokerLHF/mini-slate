@@ -1,8 +1,13 @@
-import { BaseEditor, Editor, Operation } from "slate"
+import { BaseEditor, Editor, Operation, Range } from "slate"
+
+interface Batch {
+  operations: Operation[]
+  selectionBefore: Range | null
+}
 
 interface History {
-  undos: Operation[][];
-  redos: Operation[][];
+  undos: Batch[];
+  redos: Batch[];
 }
 
 export const MERGING = new WeakMap<Editor, boolean | undefined>();
