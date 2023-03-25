@@ -117,7 +117,7 @@ export const TextTransforms: TextTransforms = {
       const isAcrossBlocks = startBlock && endBlock && !Path.equals(startBlock[1], endBlock[1]);
 
       /**
-       * 如果开始节点是空的，那么就往前一个节点。这个空节点最终作为中间节点被删除
+       * 如果开始节点是空的，那么就往前一个 point。这个空节点最终作为中间节点被删除
        * 结束节点为空同理
        */
       const isStartVoid = Editor.void(editor, { at: start, mode: 'highest' })

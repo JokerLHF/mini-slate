@@ -78,12 +78,11 @@ export const Point: PointInterface = {
       if (!p) {
         return null;
       }
-      const { path } = p;
+      const { path, offset } = p;
 
       switch (op.type) {
         case 'insert_text': {
           // 指向 insertText 的位置
-          const { path, offset } = op;
           if (
             Path.equals(op.path, path) &&
             (op.offset < offset ||
@@ -94,7 +93,6 @@ export const Point: PointInterface = {
           break;
         }
         case 'remove_text': {
-          const { path, offset } = op;
           /**
            * 12|3
            * 从23交界处删除一个字符，此时的 op.offset 是 1， path.offset 是2
