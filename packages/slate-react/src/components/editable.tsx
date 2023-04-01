@@ -7,7 +7,6 @@ import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, IS_
 import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
 import HOT_KEYS from '../utils/hotkeys';
-import { useSlateStatic } from '../hooks/use-slate-static';
 import { useSlate } from '../hooks/use-slate';
 
 export interface RenderElementProps {

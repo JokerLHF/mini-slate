@@ -20,3 +20,5 @@ pnpm run start
 - [slate operation 设计](https://n1pwb3impj.feishu.cn/wiki/wikcnIoFgguvfdYdC4LqNbJZYIb)
 - [slate ref 设计](https://n1pwb3impj.feishu.cn/wiki/wikcnK1jiv6Q7tIbcZcbYF698X0)
 - [slate 历史记录](https://n1pwb3impj.feishu.cn/wiki/wikcnAn27fQYHMoAUWISS47kXRd)
+- [dirtyPath & normalize](https://n1pwb3impj.feishu.cn/wiki/wikcn2rPwdGHTSH1kQ7Zk3Ukuxb)
+- [slate 视图层更新](https://n1pwb3impj.feishu.cn/wiki/wikcnW1S71qKDNVyNbVZTFMeVVd)
