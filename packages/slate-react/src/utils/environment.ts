@@ -7,3 +7,10 @@ export const CAN_USE_DOM = !!(
 );
 
 export const IS_APPLE = typeof navigator !== 'undefined' && /Mac OS X/.test(navigator.userAgent);
+
+export const IS_SAFARI =
+  typeof navigator !== 'undefined' &&
+  /Version\/[\d\.]+.*Safari/.test(navigator.userAgent)
+
+export const IS_CHROME =
+  typeof navigator !== 'undefined' && /Chrome/i.test(navigator.userAgent)

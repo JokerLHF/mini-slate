@@ -8,10 +8,12 @@ const HOTKEYS = {
   undo: 'mod+z',
   moveBackward: 'left',
   moveForward: 'right',
+  deleteBackward: 'shift?+backspace',
 }
 
 const APPLE_HOTKEYS = {
   redo: 'cmd+shift+z',
+  deleteBackward: ['ctrl+backspace', 'ctrl+h'],
 }
 
 const WINDOWS_HOTKEYS = {
@@ -45,4 +47,5 @@ export default {
   isUndo: create('undo'),
   isMoveBackward: create('moveBackward'), // 往前移动
   isMoveForward: create('moveForward'), // 往后移动
+  isDeleteBackward: create('deleteBackward'),
 }

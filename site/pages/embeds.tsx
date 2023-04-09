@@ -10,10 +10,12 @@ import {
   Editable,
   withReact,
   ReactEditor,
+  useSlateStatic,
 } from 'slate-react'
+import { withHistory } from 'slate-history';
 
 const EmbedsExample = () => {
-  const editor = useMemo(() => withEmbeds(withReact(createEditor())), [])
+  const editor = useMemo(() => withEmbeds(withHistory(withReact(createEditor()))), [])
   return (
     <Slate editor={editor} value={initialValue}>
       <Editable
@@ -115,7 +117,7 @@ const initialValue: Descendant[] = [
   {
     type: 'video',
     url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm',
-    children: [{ text: '' }],
+    children: [{ text: '111' }],
   },
   {
     type: 'paragraph',

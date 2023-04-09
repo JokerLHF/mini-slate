@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useChildren } from '../hooks/use-children';
-import { Element, Text, Transforms, Range, NodeEntry, Editor, Path, BaseRange } from 'slate';
+import { Element, Text, Node, Transforms, Range, NodeEntry, Editor, Path, BaseRange } from 'slate';
 import { useIsomorphicLayoutEffect } from '../hooks/use-isomorphic-layout-effect';
 import { ReactEditor } from '../plugin/react-editor';
 import { EDITOR_TO_ELEMENT, EDITOR_TO_WINDOW, ELEMENT_TO_NODE, IS_COMPOSING, IS_FOCUSED } from '../utils/weak-map';
@@ -8,6 +8,7 @@ import { DOMNode, DOMRange, getDefaultView, isDOMNode } from '../utils/dom';
 import { debounce, throttle } from 'lodash';
 import HOT_KEYS from '../utils/hotkeys';
 import { useSlate } from '../hooks/use-slate';
+import { IS_CHROME, IS_SAFARI } from '../utils/environment';
 
 export interface RenderElementProps {
   children: any;
@@ -305,6 +306,28 @@ export const Editable = (props: EditableProps) => {
           }
 
           return;
+        }
+
+         if (IS_CHROME || IS_SAFARI) {
+          // COMPAT: Chrome and Safari support `beforeinput` event but do not fire
+          // an event when deleting backwards in a selected void inline node
+          if (
+            selection && HOT_KEYS.isDeleteBackward(nativeEvent) && Range.isCollapsed(selection)
+          ) {
+            const currentNode = Node.parent(
+              editor,
+              selection.anchor.path
+            )
+
+            if (
+              Element.isElement(currentNode) &&
+              Editor.isVoid(editor, currentNode)
+            ) {
+              event.preventDefault()
+              Editor.deleteBackward(editor);
+              return
+            }
+          }
         }
       }, [onKeyDown])}
       onCopy={useCallback((event: React.ClipboardEvent<HTMLDivElement>) => { // command+c

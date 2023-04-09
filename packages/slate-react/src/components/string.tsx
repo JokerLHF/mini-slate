@@ -1,5 +1,5 @@
 import React from 'react'
-import { Element, Text } from 'slate'
+import { Element, Text, Node } from 'slate'
 import { useSlateStatic } from '../hooks/use-slate-static'
 
 /**
@@ -13,6 +13,10 @@ const String = (props: {
 }) => {
   const { text, parent, leaf } = props;
   const editor = useSlateStatic();
+
+  if (editor.isVoid(parent)) {
+    return <ZeroWidthString length={Node.string(parent).length} />
+  }
 
   /**
    *  {
@@ -80,8 +84,8 @@ const TextString = (props: { text: string }) => {
 
   return (
     <span {...attributes}>
-      {'\uFEFF'}
-      {isLineBreak ? <br /> : null}
+      { isLineBreak ? null : '\uFEFF' }
+      { isLineBreak ? <br /> : null }
     </span>
   )
 }

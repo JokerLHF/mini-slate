@@ -35,12 +35,14 @@ export interface EditorNodesOptions<T extends Node> {
   at?: Location;
   match?: NodeMatch<T>;
   reverse?: boolean;
-  mode?: SelectionMode,
+  mode?: SelectionMode;
+  voids?: boolean;
 }
 
 export interface EditorPositionsOptions {
   at?: Location,
   reverse?: boolean,
+  voids?: boolean;
 }
 
 export type NodeMatch<T extends Node> =
@@ -62,6 +64,7 @@ export interface EditorPreviousOptions<T extends Node> {
   at?: Location;
   match?: NodeMatch<T>;
   mode?: SelectionMode;
+  voids?: boolean;
 }
 
 export interface EditorParentOptions {
@@ -91,6 +94,10 @@ export interface AfterOptions {
 export interface EditorVoidOptions {
   at?: Location
   mode?: RangeMode
+}
+
+export interface EditorStringOptions {
+  voids?: boolean;
 }
 
 /**
@@ -211,7 +218,7 @@ export interface EditorInterface {
 
   insertBreak: (editor: Editor) => void;
   isEmpty: (editor: Editor, element: Element) => boolean;
-  string: (editor: Editor, at: Location) => string;
+  string: (editor: Editor, at: Location, options?: EditorStringOptions) => string;
   isBlock: (editor: Editor, value: Element) => boolean;
   isInline: (editor: Editor, value: Element) => boolean;
 
@@ -220,6 +227,7 @@ export interface EditorInterface {
     editor: Editor,
     options?: EditorVoidOptions
   ) => NodeEntry<Element> | undefined;
+  hasInlines: (editor: Editor, element: Element) => boolean;
 }
 
 export const root = `__SLATE__${Math.random()}`;
@@ -475,6 +483,7 @@ export const Editor: EditorInterface = {
       match = () => true,
       reverse = false,
       mode = 'all',
+      voids = false,
     } = options;
 
     if (!at) {
@@ -489,7 +498,11 @@ export const Editor: EditorInterface = {
     const nodeEntrys = Node.nodes(editor, {
       from,
       to,
-      reverse
+      reverse,
+      pass: ([node]) => {
+        // 不需要 void 节点的时候忽略 void 节点，pass=true 忽略遍历子节点
+        return voids ? false : Element.isElement(node) && Editor.isVoid(editor, node)
+      }
     });
 
     let lastNodeEntry: NodeEntry<T> | undefined;
@@ -526,11 +539,17 @@ export const Editor: EditorInterface = {
     }
   },
 
+  hasInlines(editor: Editor, element: Element): boolean {
+    return element.children.some(
+      n => Text.isText(n) || Editor.isInline(editor, n)
+    )
+  },
+
   /**
    * 在 at 范围之内，返回所有的 point 节点
    */
   *positions(editor: Editor, options: EditorPositionsOptions = {}): Generator<Point, void, undefined> {
-    const { at, reverse = false } = options;
+    const { at, reverse = false, voids = false } = options;
     if (!at) {
       return;
     }
@@ -540,44 +559,67 @@ export const Editor: EditorInterface = {
 
     for (const nodeEntry of Editor.nodes(editor, {
       at: range,
-      match: Text.isText,
-      reverse
+      reverse,
+      voids,
     })) {
-      const [textNode, textNodePath] = nodeEntry;
-      const isFirstNode = Path.equals(textNodePath, start.path);
-      const isEndNode = Path.equals(textNodePath, end.path);
-      const endOffset = isEndNode ? end.offset : textNode.text.length;
-      const startOffset = isFirstNode ? start.offset : 0;
+      const [node, nodePath] = nodeEntry;
 
-      if (reverse) {
-        let offset = textNode.text.length;
-        while(true) {
-          if (offset > endOffset) {
-            offset--;
-            continue;
-          }
-          if (offset < startOffset) {
-            break;
-          }
-          yield { path: textNodePath, offset }
-          offset--;
-        }
-        continue;
-      }
-
-      let offset = 0;
-      while(true) {
-        // 在开始point之前不参与
-        if (offset < startOffset) {
-          offset++;
+      if (Element.isElement(node)) {
+        // 在不考虑 voids 的情况下：void 节点不需要返回所有 text 位置， 只需要返回第一个 position 位置
+        if (!voids && editor.isVoid(node)) {
+          yield Editor.start(editor, nodePath);
           continue;
         }
-        // 在结束point之后表示
-        if (offset > endOffset) {
-          break;
+
+        // // 返回所有子节点的文本
+        // if (Editor.hasInlines(editor, node)) {
+        //   /**
+        //    *     element
+        //    * text1 text2 text3
+        //    * text2 就是 end 的情况下直接返回 end
+        //    */
+        //   const s = Path.isAncestor(nodePath, start.path) ? start : Editor.start(editor, nodePath);
+        //   const e = Path.isAncestor(nodePath, end.path) ? end : Editor.end(editor, nodePath);
+        //   blockText = Editor.string(editor, { anchor: s, focus: e }, { voids })
+        // }
+      }
+      
+      if (Text.isText(node)) {
+        const isFirstNode = Path.equals(nodePath, start.path);
+        const isEndNode = Path.equals(nodePath, end.path);
+        const endOffset = isEndNode ? end.offset : node.text.length;
+        const startOffset = isFirstNode ? start.offset : 0;
+  
+        if (reverse) {
+          let offset = node.text.length;
+          while(true) {
+            if (offset > endOffset) {
+              offset--;
+              continue;
+            }
+            if (offset < startOffset) {
+              break;
+            }
+            yield { path: nodePath, offset }
+            offset--;
+          }
+          continue;
         }
-        yield { path: textNodePath, offset }
-        offset++;
+  
+        let offset = 0;
+        while(true) {
+          // 在开始point之前不参与
+          if (offset < startOffset) {
+            offset++;
+            continue;
+          }
+          // 在结束point之后表示
+          if (offset > endOffset) {
+            break;
+          }
+          yield { path: nodePath, offset }
+          offset++;
+        }
       }
     }
   },
@@ -643,12 +685,13 @@ export const Editor: EditorInterface = {
     return  target;
   },
 
-  string(editor: Editor, at: Location) {
+  string(editor: Editor, at: Location, options: EditorStringOptions = {}) {
+    const { voids = false } = options
     const range = Editor.range(editor, at);
     const [start, end] = Range.edges(range);
 
     let text = '';
-    for (const [textNode, textNodePath] of Editor.nodes(editor, { at: range, match: Text.isText })) {
+    for (const [textNode, textNodePath] of Editor.nodes(editor, { at: range, match: Text.isText, voids })) {
       if (Path.equals(start.path, textNodePath)) {
         text += textNode.text.slice(start.offset);
       } else if (Path.equals(end.path, textNodePath)) {
@@ -739,7 +782,7 @@ export const Editor: EditorInterface = {
     editor: Editor,
     options: EditorPreviousOptions<T> = {}
   ): NodeEntry<T> | undefined {
-    const { at = editor.selection,  mode = 'lowest', } = options;
+    const { at = editor.selection,  mode = 'lowest', voids = false } = options;
     let { match } = options;
     if (!at) {
       return;
@@ -766,7 +809,8 @@ export const Editor: EditorInterface = {
       at: { anchor: start, focus: beforePoint },
       reverse: true,
       match,
-      mode
+      mode,
+      voids
     });
 
     return prev;
